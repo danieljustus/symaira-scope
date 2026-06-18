@@ -101,20 +101,15 @@ func Conflicts(ports []model.Port) []model.Conflict {
 		byPort[p.Port][p.PID] = p.Process
 	}
 
-	var out []model.Conflict
-	for port, holders := range byPort {
-		if len(holders) < 2 {
-			continue
-		}
-		hs := make([]string, 0, len(holders))
-		for pid, name := range holders {
+	holders := make(map[int][]string, len(byPort))
+	for port, pidMap := range byPort {
+		hs := make([]string, 0, len(pidMap))
+		for pid, name := range pidMap {
 			hs = append(hs, fmt.Sprintf("%s(pid %d)", name, pid))
 		}
-		sort.Strings(hs)
-		out = append(out, model.Conflict{Port: port, Holders: hs})
+		holders[port] = hs
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Port < out[j].Port })
-	return out
+	return conflictsFromMap(holders, "")
 }
 
 // MCPServerConflicts checks whether any MCP server's HTTP URL port is already
@@ -150,13 +145,17 @@ func MCPServerConflicts(servers []model.MCPServer, listening []model.Port) []mod
 		byPort[port] = append(byPort[port], holder)
 	}
 
+	return conflictsFromMap(byPort, "mcp-occupied")
+}
+
+func conflictsFromMap(byPort map[int][]string, kind string) []model.Conflict {
 	var out []model.Conflict
 	for port, holders := range byPort {
 		if len(holders) < 2 {
 			continue
 		}
 		sort.Strings(holders)
-		out = append(out, model.Conflict{Port: port, Holders: holders, Kind: "mcp-occupied"})
+		out = append(out, model.Conflict{Port: port, Holders: holders, Kind: kind})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Port < out[j].Port })
 	return out
