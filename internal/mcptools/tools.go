@@ -56,7 +56,8 @@ func Register(srv *mcpserver.Server) {
 		Description: "Discover MCP servers configured across local AI clients (Claude, Cursor, VS Code, Windsurf, project).",
 		InputSchema: json.RawMessage(emptyObject),
 		Handler: func(_ context.Context, _ json.RawMessage) (any, error) {
-			return mcpcfg.Discover(mcpcfg.DefaultSources()), nil
+			servers, _ := mcpcfg.Discover(mcpcfg.DefaultSources())
+			return servers, nil
 		},
 	})
 	srv.RegisterTool(&mcpserver.Tool{
@@ -76,7 +77,7 @@ func Register(srv *mcpserver.Server) {
 		Description: "Health-check discovered MCP servers by probing each one. Spawns processes or makes HTTP requests to verify servers respond.",
 		InputSchema: json.RawMessage(emptyObject),
 		Handler: func(_ context.Context, _ json.RawMessage) (any, error) {
-			servers := mcpcfg.Discover(mcpcfg.DefaultSources())
+			servers, _ := mcpcfg.Discover(mcpcfg.DefaultSources())
 			return mcphealth.ProbeAll(servers), nil
 		},
 	})

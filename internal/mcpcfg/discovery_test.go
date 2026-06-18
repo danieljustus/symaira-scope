@@ -19,7 +19,7 @@ func TestDiscoverParsesProjectConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Discover([]Source{{Client: "test", Path: path, Key: "mcpServers"}})
+	got, _ := Discover([]Source{{Client: "test", Path: path, Key: "mcpServers"}})
 	if len(got) != 2 {
 		t.Fatalf("want 2 servers, got %d", len(got))
 	}
@@ -57,7 +57,7 @@ func TestDiscoverYAMLGoose(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Discover([]Source{{Client: "goose", Path: path, Key: "mcp_servers"}})
+	got, _ := Discover([]Source{{Client: "goose", Path: path, Key: "mcp_servers"}})
 	if len(got) != 2 {
 		t.Fatalf("want 2 servers, got %d", len(got))
 	}
@@ -90,7 +90,7 @@ func TestDiscoverYAMLStructuredGoose(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Discover([]Source{{Client: "goose", Path: path, Key: "mcp_servers"}})
+	got, _ := Discover([]Source{{Client: "goose", Path: path, Key: "mcp_servers"}})
 	if len(got) != 1 {
 		t.Fatalf("want 1 server, got %d", len(got))
 	}
@@ -109,7 +109,7 @@ func TestDiscoverYAMLKeyNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Discover([]Source{{Client: "test", Path: path, Key: "mcp_servers"}})
+	got, _ := Discover([]Source{{Client: "test", Path: path, Key: "mcp_servers"}})
 	if len(got) != 0 {
 		t.Fatalf("want 0 servers when key missing, got %d", len(got))
 	}
@@ -127,7 +127,7 @@ func TestDiscoverAiderYML(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Discover([]Source{{Client: "aider", Path: path, Key: "mcp"}})
+	got, _ := Discover([]Source{{Client: "aider", Path: path, Key: "mcp"}})
 	if len(got) != 1 {
 		t.Fatalf("want 1 server, got %d", len(got))
 	}
@@ -156,7 +156,7 @@ func TestDiscoverGlobExpansion(t *testing.T) {
 	}
 
 	pattern := filepath.Join(extDir, "*roo*", "settings", "roo_mcp_settings.json")
-	got := Discover([]Source{{Client: "roo-code", Path: pattern, Key: "mcpServers"}})
+	got, _ := Discover([]Source{{Client: "roo-code", Path: pattern, Key: "mcpServers"}})
 	if len(got) != 2 {
 		t.Fatalf("want 2 servers from glob, got %d", len(got))
 	}
@@ -173,7 +173,7 @@ func TestDiscoverGlobExpansion(t *testing.T) {
 func TestDiscoverGlobNoMatch(t *testing.T) {
 	dir := t.TempDir()
 	pattern := filepath.Join(dir, "*nonexistent*", "settings.json")
-	got := Discover([]Source{{Client: "test", Path: pattern, Key: "mcpServers"}})
+	got, _ := Discover([]Source{{Client: "test", Path: pattern, Key: "mcpServers"}})
 	if len(got) != 0 {
 		t.Fatalf("want 0 servers from non-matching glob, got %d", len(got))
 	}
@@ -199,7 +199,7 @@ func TestDiscoverDeduplicatesByClientName(t *testing.T) {
 		{Client: "vscode", Path: path1, Key: "mcpServers"},
 		{Client: "vscode", Path: path2, Key: "mcpServers"},
 	}
-	got := Discover(sources)
+	got, _ := Discover(sources)
 	if len(got) != 3 {
 		t.Fatalf("want 3 unique servers (dedup shared), got %d", len(got))
 	}
@@ -220,7 +220,7 @@ func TestDiscoverJSONWithEnvField(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Discover([]Source{{Client: "test", Path: path, Key: "mcpServers"}})
+	got, _ := Discover([]Source{{Client: "test", Path: path, Key: "mcpServers"}})
 	if len(got) != 1 {
 		t.Fatalf("want 1 server, got %d", len(got))
 	}
@@ -237,7 +237,7 @@ func TestDiscoverCline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Discover([]Source{{Client: "cline", Path: path, Key: "mcpServers"}})
+	got, _ := Discover([]Source{{Client: "cline", Path: path, Key: "mcpServers"}})
 	if len(got) != 1 {
 		t.Fatalf("want 1 server, got %d", len(got))
 	}
@@ -254,7 +254,7 @@ func TestDiscoverContinue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Discover([]Source{{Client: "continue", Path: path, Key: "mcpServers"}})
+	got, _ := Discover([]Source{{Client: "continue", Path: path, Key: "mcpServers"}})
 	if len(got) != 1 {
 		t.Fatalf("want 1 server, got %d", len(got))
 	}
@@ -271,7 +271,7 @@ func TestDiscoverZed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Discover([]Source{{Client: "zed", Path: path, Key: "mcpServers"}})
+	got, _ := Discover([]Source{{Client: "zed", Path: path, Key: "mcpServers"}})
 	if len(got) != 1 {
 		t.Fatalf("want 1 server, got %d", len(got))
 	}

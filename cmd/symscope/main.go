@@ -138,7 +138,13 @@ func newMCPCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List discovered MCP servers",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return printJSON(mcpcfg.Discover(mcpcfg.DefaultSources()))
+			servers, notes := mcpcfg.Discover(mcpcfg.DefaultSources())
+			if len(notes) > 0 {
+				for _, n := range notes {
+					slog.Warn(n)
+				}
+			}
+			return printJSON(servers)
 		},
 	})
 
@@ -209,11 +215,16 @@ func newMCPCmd() *cobra.Command {
 		Use:   "health",
 		Short: "Health-check discovered MCP servers",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			servers := mcpcfg.Discover(mcpcfg.DefaultSources())
+			servers, notes := mcpcfg.Discover(mcpcfg.DefaultSources())
 			if !probe {
 				results := make([]model.MCPHealthResult, len(servers))
 				for i, s := range servers {
 					results[i] = model.MCPHealthResult{Name: s.Name, Client: s.Client, Status: "unknown"}
+				}
+				if len(notes) > 0 {
+					for _, n := range notes {
+						slog.Warn(n)
+					}
 				}
 				return printJSON(results)
 			}
@@ -259,7 +270,7 @@ func newConflictsCmd() *cobra.Command {
 				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "list ports")
 			}
 			all := ports.Conflicts(p)
-			servers := mcpcfg.Discover(mcpcfg.DefaultSources())
+			servers, _ := mcpcfg.Discover(mcpcfg.DefaultSources())
 			all = append(all, ports.MCPServerConflicts(servers, p)...)
 			return printJSON(all)
 		},

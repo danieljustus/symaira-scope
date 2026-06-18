@@ -123,7 +123,8 @@ func expandGlob(s Source) []Source {
 }
 
 // Discover parses each source that exists and returns the servers found.
-func Discover(sources []Source) []model.MCPServer {
+// Any parse errors are returned as notes in the second return value.
+func Discover(sources []Source) ([]model.MCPServer, []string) {
 	// Expand any glob patterns in source paths.
 	var expanded []Source
 	for _, s := range sources {
@@ -131,10 +132,12 @@ func Discover(sources []Source) []model.MCPServer {
 	}
 
 	var out []model.MCPServer
+	var notes []string
 	seen := map[string]bool{} // "client:name" → already emitted
 	for _, s := range expanded {
 		servers, err := parseConfig(s.Path, s.Key)
 		if err != nil {
+			notes = append(notes, fmt.Sprintf("config parse error for %s (%s): %v", s.Client, s.Path, err))
 			continue
 		}
 		for name, e := range servers {
@@ -176,7 +179,7 @@ func Discover(sources []Source) []model.MCPServer {
 		}
 		return out[i].Name < out[j].Name
 	})
-	return out
+	return out, notes
 }
 
 // FoundClients reports which known client configs are present on disk.
