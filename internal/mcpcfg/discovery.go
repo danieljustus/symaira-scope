@@ -46,7 +46,7 @@ func DefaultSources() []Source {
 	}
 }
 
-type entry struct {
+type Entry struct {
 	Command string            `json:"command"`
 	Args    []string          `json:"args"`
 	URL     string            `json:"url"`
@@ -56,7 +56,7 @@ type entry struct {
 
 // parseConfig reads a config file and returns the server map under the given key.
 // It detects JSON vs YAML by file extension (.yaml/.yml → YAML, else JSON).
-func parseConfig(path, key string) (map[string]entry, error) {
+func parseConfig(path, key string) (map[string]Entry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func parseConfig(path, key string) (map[string]entry, error) {
 	return parseJSONConfig(data, key)
 }
 
-func parseJSONConfig(data []byte, key string) (map[string]entry, error) {
+func parseJSONConfig(data []byte, key string) (map[string]Entry, error) {
 	var doc map[string]json.RawMessage
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("parse json: %w", err)
@@ -77,14 +77,14 @@ func parseJSONConfig(data []byte, key string) (map[string]entry, error) {
 	if !ok {
 		return nil, fmt.Errorf("key %q not found", key)
 	}
-	var servers map[string]entry
+	var servers map[string]Entry
 	if err := json.Unmarshal(raw, &servers); err != nil {
 		return nil, fmt.Errorf("parse servers: %w", err)
 	}
 	return servers, nil
 }
 
-func parseYAMLConfig(data []byte, key string) (map[string]entry, error) {
+func parseYAMLConfig(data []byte, key string) (map[string]Entry, error) {
 	var doc map[string]any
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("parse yaml: %w", err)
@@ -97,7 +97,7 @@ func parseYAMLConfig(data []byte, key string) (map[string]entry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshal yaml subtree: %w", err)
 	}
-	var servers map[string]entry
+	var servers map[string]Entry
 	if err := json.Unmarshal(jsonBytes, &servers); err != nil {
 		return nil, fmt.Errorf("parse servers: %w", err)
 	}
@@ -177,4 +177,111 @@ func FoundClients(sources []Source) []model.ClientConfig {
 		out = append(out, model.ClientConfig{Client: s.Client, Path: s.Path, Present: err == nil})
 	}
 	return out
+}
+
+// AddServer writes a new MCP server entry to a client's config file.
+// If the file doesn't exist, it creates it with the proper structure.
+func AddServer(source Source, name string, server Entry) error {
+	data, err := os.ReadFile(source.Path)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read config: %w", err)
+	}
+
+	var doc map[string]any
+	if err == nil {
+		ext := strings.ToLower(filepath.Ext(source.Path))
+		if ext == ".yaml" || ext == ".yml" {
+			if err := yaml.Unmarshal(data, &doc); err != nil {
+				return fmt.Errorf("parse yaml: %w", err)
+			}
+		} else {
+			if err := json.Unmarshal(data, &doc); err != nil {
+				return fmt.Errorf("parse json: %w", err)
+			}
+		}
+	} else {
+		doc = make(map[string]any)
+	}
+
+	servers, ok := doc[source.Key].(map[string]any)
+	if !ok {
+		servers = make(map[string]any)
+	}
+
+	serverMap := map[string]any{
+		"command": server.Command,
+	}
+	if len(server.Args) > 0 {
+		serverMap["args"] = server.Args
+	}
+	if server.URL != "" {
+		serverMap["url"] = server.URL
+	}
+	if len(server.Env) > 0 {
+		serverMap["env"] = server.Env
+	}
+
+	servers[name] = serverMap
+	doc[source.Key] = servers
+
+	ext := strings.ToLower(filepath.Ext(source.Path))
+	if ext == ".yaml" || ext == ".yml" {
+		out, err := yaml.Marshal(doc)
+		if err != nil {
+			return fmt.Errorf("marshal yaml: %w", err)
+		}
+		return os.WriteFile(source.Path, out, 0644)
+	}
+
+	out, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal json: %w", err)
+	}
+	return os.WriteFile(source.Path, append(out, '\n'), 0644)
+}
+
+// RemoveServer removes an MCP server entry from a client's config file.
+func RemoveServer(source Source, name string) error {
+	data, err := os.ReadFile(source.Path)
+	if err != nil {
+		return fmt.Errorf("read config: %w", err)
+	}
+
+	var doc map[string]any
+	ext := strings.ToLower(filepath.Ext(source.Path))
+	if ext == ".yaml" || ext == ".yml" {
+		if err := yaml.Unmarshal(data, &doc); err != nil {
+			return fmt.Errorf("parse yaml: %w", err)
+		}
+	} else {
+		if err := json.Unmarshal(data, &doc); err != nil {
+			return fmt.Errorf("parse json: %w", err)
+		}
+	}
+
+	servers, ok := doc[source.Key].(map[string]any)
+	if !ok {
+		return fmt.Errorf("no servers found under key %q", source.Key)
+	}
+
+	if _, exists := servers[name]; !exists {
+		return fmt.Errorf("server %q not found in %s config", name, source.Client)
+	}
+
+	delete(servers, name)
+	doc[source.Key] = servers
+
+	if ext == ".yaml" || ext == ".yml" {
+		out, err := yaml.Marshal(doc)
+		if err != nil {
+			return fmt.Errorf("marshal yaml: %w", err)
+		}
+		return os.WriteFile(source.Path, out, 0644)
+	}
+
+	out, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal json: %w", err)
+	}
+	return os.WriteFile(source.Path, append(out, '\n'), 0644)
 }

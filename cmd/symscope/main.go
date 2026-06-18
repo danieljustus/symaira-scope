@@ -17,6 +17,7 @@ import (
 
 	"github.com/danieljustus/symaira-scope/internal/cache"
 	"github.com/danieljustus/symaira-scope/internal/containers"
+	"github.com/danieljustus/symaira-scope/internal/explain"
 	"github.com/danieljustus/symaira-scope/internal/mcpcfg"
 	"github.com/danieljustus/symaira-scope/internal/mcptools"
 	"github.com/danieljustus/symaira-scope/internal/ports"
@@ -58,6 +59,7 @@ an MCP server for agents.`,
 		newClientsCmd(),
 		newContainersCmd(),
 		newConflictsCmd(),
+		newExplainCmd(),
 		newCacheCmd(),
 		newServeCmd(),
 		newVersionCmd(),
@@ -137,6 +139,69 @@ func newMCPCmd() *cobra.Command {
 			return printJSON(mcpcfg.Discover(mcpcfg.DefaultSources()))
 		},
 	})
+
+	var addName, addCommand, addClient, addURL string
+	var addArgs []string
+	addCmd := &cobra.Command{
+		Use:   "add",
+		Short: "Add an MCP server to a client config",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			sources := mcpcfg.DefaultSources()
+			var source *mcpcfg.Source
+			for _, s := range sources {
+				if s.Client == addClient {
+					source = &s
+					break
+				}
+			}
+			if source == nil {
+				return exitcodes.Wrap(fmt.Errorf("unknown client %q", addClient), exitcodes.ExitConfig, exitcodes.KindValidation, "mcp add")
+			}
+			if err := mcpcfg.AddServer(*source, addName, mcpcfg.Entry{Command: addCommand, Args: addArgs, URL: addURL}); err != nil {
+				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "mcp add")
+			}
+			fmt.Printf("Added %s to %s config.\n", addName, addClient)
+			return nil
+		},
+	}
+	addCmd.Flags().StringVar(&addName, "name", "", "Server name")
+	addCmd.Flags().StringVar(&addCommand, "command", "", "Command to run")
+	addCmd.Flags().StringArrayVar(&addArgs, "args", nil, "Command arguments")
+	addCmd.Flags().StringVar(&addURL, "url", "", "HTTP URL (for HTTP transport)")
+	addCmd.Flags().StringVar(&addClient, "client", "", "AI client (e.g. claude-desktop, cursor)")
+	addCmd.MarkFlagRequired("name")
+	addCmd.MarkFlagRequired("client")
+	cmd.AddCommand(addCmd)
+
+	var rmName, rmClient string
+	rmCmd := &cobra.Command{
+		Use:   "remove",
+		Short: "Remove an MCP server from a client config",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			sources := mcpcfg.DefaultSources()
+			var source *mcpcfg.Source
+			for _, s := range sources {
+				if s.Client == rmClient {
+					source = &s
+					break
+				}
+			}
+			if source == nil {
+				return exitcodes.Wrap(fmt.Errorf("unknown client %q", rmClient), exitcodes.ExitConfig, exitcodes.KindValidation, "mcp remove")
+			}
+			if err := mcpcfg.RemoveServer(*source, rmName); err != nil {
+				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "mcp remove")
+			}
+			fmt.Printf("Removed %s from %s config.\n", rmName, rmClient)
+			return nil
+		},
+	}
+	rmCmd.Flags().StringVar(&rmName, "name", "", "Server name")
+	rmCmd.Flags().StringVar(&rmClient, "client", "", "AI client")
+	rmCmd.MarkFlagRequired("name")
+	rmCmd.MarkFlagRequired("client")
+	cmd.AddCommand(rmCmd)
+
 	return cmd
 }
 
@@ -178,6 +243,44 @@ func newConflictsCmd() *cobra.Command {
 			return printJSON(all)
 		},
 	}
+}
+
+func newExplainCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "explain", Short: "Explain what uses a port or server"}
+
+	var port int
+	portCmd := &cobra.Command{
+		Use:   "port",
+		Short: "Explain what's using a specific port",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			exp, err := explain.ExplainPort(port)
+			if err != nil {
+				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "explain port")
+			}
+			return printJSON(exp)
+		},
+	}
+	portCmd.Flags().IntVar(&port, "number", 0, "Port number to explain")
+	portCmd.MarkFlagRequired("number")
+	cmd.AddCommand(portCmd)
+
+	var serverName string
+	serverCmd := &cobra.Command{
+		Use:   "server",
+		Short: "Explain a specific MCP server",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			exp, err := explain.ExplainServer(serverName)
+			if err != nil {
+				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "explain server")
+			}
+			return printJSON(exp)
+		},
+	}
+	serverCmd.Flags().StringVar(&serverName, "name", "", "Server name to explain")
+	serverCmd.MarkFlagRequired("name")
+	cmd.AddCommand(serverCmd)
+
+	return cmd
 }
 
 func newCacheCmd() *cobra.Command {
