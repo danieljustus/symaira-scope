@@ -220,7 +220,7 @@ func newMCPCmd() *cobra.Command {
 			return printJSON(mcphealth.ProbeAll(servers))
 		},
 	}
-	health.Flags().BoolVar(&probe, "probe", false, "actually probe each server (spawns processes / makes HTTP requests)")
+	health.Flags().BoolVar(&probe, "probe", false, "actually probe each server (WARNING: executes commands from MCP config files)")
 	cmd.AddCommand(health)
 
 	return cmd
