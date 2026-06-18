@@ -149,14 +149,23 @@ func Discover(sources []Source) []model.MCPServer {
 			if e.Type != "" {
 				transport = e.Type
 			}
+			secretBacked := false
+			for _, v := range e.Env {
+				if strings.HasPrefix(v, "vault://") {
+					secretBacked = true
+					break
+				}
+			}
 			out = append(out, model.MCPServer{
-				Name:       name,
-				Client:     s.Client,
-				Transport:  transport,
-				Command:    e.Command,
-				Args:       e.Args,
-				URL:        e.URL,
-				ConfigPath: s.Path,
+				Name:        name,
+				Client:      s.Client,
+				Transport:   transport,
+				Command:     e.Command,
+				Args:        e.Args,
+				URL:         e.URL,
+				ConfigPath:  s.Path,
+				Env:         e.Env,
+				SecretBacked: secretBacked,
 			})
 		}
 	}
