@@ -16,14 +16,16 @@ func Build() (model.Snapshot, error) {
 	if err != nil {
 		return model.Snapshot{}, err
 	}
-	servers := mcpcfg.Discover(mcpcfg.DefaultSources())
-	c, notes := containers.List()
+	servers, notes := mcpcfg.Discover(mcpcfg.DefaultSources())
+	c, containerNotes := containers.List()
+
+	allNotes := append(notes, containerNotes...)
 
 	return model.Snapshot{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 		Ports:       p,
 		MCPServers:  servers,
 		Containers:  c,
-		Notes:       notes,
+		Notes:       allNotes,
 	}, nil
 }

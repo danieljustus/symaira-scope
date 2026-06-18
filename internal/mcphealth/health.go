@@ -1,3 +1,12 @@
+// Package mcphealth probes MCP servers to check if they respond to an
+// initialize request.
+//
+// Trust model: symscope reads MCP server configs from well-known local paths.
+// When --probe is used, it executes the commands and URLs found in those
+// configs. This is safe because symscope is a local-only tool that trusts its
+// own config files — the same trust model as the AI clients themselves.
+// Malicious configs could execute arbitrary binaries, but the user must have
+// already installed those configs.
 package mcphealth
 
 import (

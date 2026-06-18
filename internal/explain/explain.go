@@ -61,7 +61,7 @@ func ExplainPort(portNum int) (*PortExplanation, error) {
 		}
 	}
 
-	servers := mcpcfg.Discover(mcpcfg.DefaultSources())
+	servers, _ := mcpcfg.Discover(mcpcfg.DefaultSources())
 	for _, s := range servers {
 		if s.URL == "" {
 			continue
@@ -100,7 +100,7 @@ func ExplainPort(portNum int) (*PortExplanation, error) {
 }
 
 func ExplainServer(name string) (*ServerExplanation, error) {
-	servers := mcpcfg.Discover(mcpcfg.DefaultSources())
+	servers, _ := mcpcfg.Discover(mcpcfg.DefaultSources())
 
 	var found *model.MCPServer
 	for _, s := range servers {

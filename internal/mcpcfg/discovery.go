@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/danieljustus/symaira-corekit/fsutil"
 	"github.com/danieljustus/symaira-scope/internal/model"
 	"gopkg.in/yaml.v3"
 )
@@ -122,7 +123,8 @@ func expandGlob(s Source) []Source {
 }
 
 // Discover parses each source that exists and returns the servers found.
-func Discover(sources []Source) []model.MCPServer {
+// Any parse errors are returned as notes in the second return value.
+func Discover(sources []Source) ([]model.MCPServer, []string) {
 	// Expand any glob patterns in source paths.
 	var expanded []Source
 	for _, s := range sources {
@@ -130,10 +132,12 @@ func Discover(sources []Source) []model.MCPServer {
 	}
 
 	var out []model.MCPServer
+	var notes []string
 	seen := map[string]bool{} // "client:name" → already emitted
 	for _, s := range expanded {
 		servers, err := parseConfig(s.Path, s.Key)
 		if err != nil {
+			notes = append(notes, fmt.Sprintf("config parse error for %s (%s): %v", s.Client, s.Path, err))
 			continue
 		}
 		for name, e := range servers {
@@ -175,7 +179,7 @@ func Discover(sources []Source) []model.MCPServer {
 		}
 		return out[i].Name < out[j].Name
 	})
-	return out
+	return out, notes
 }
 
 // FoundClients reports which known client configs are present on disk.
@@ -233,20 +237,7 @@ func AddServer(source Source, name string, server Entry) error {
 	servers[name] = serverMap
 	doc[source.Key] = servers
 
-	ext := strings.ToLower(filepath.Ext(source.Path))
-	if ext == ".yaml" || ext == ".yml" {
-		out, err := yaml.Marshal(doc)
-		if err != nil {
-			return fmt.Errorf("marshal yaml: %w", err)
-		}
-		return os.WriteFile(source.Path, out, 0644)
-	}
-
-	out, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal json: %w", err)
-	}
-	return os.WriteFile(source.Path, append(out, '\n'), 0644)
+	return writeConfig(source.Path, doc)
 }
 
 // RemoveServer removes an MCP server entry from a client's config file.
@@ -280,17 +271,25 @@ func RemoveServer(source Source, name string) error {
 	delete(servers, name)
 	doc[source.Key] = servers
 
+	return writeConfig(source.Path, doc)
+}
+
+// writeConfig marshals the document to the appropriate format and writes it
+// atomically. The original file is preserved until the write succeeds,
+// preventing corruption on crash or interrupt.
+func writeConfig(path string, doc map[string]any) error {
+	ext := strings.ToLower(filepath.Ext(path))
 	if ext == ".yaml" || ext == ".yml" {
 		out, err := yaml.Marshal(doc)
 		if err != nil {
 			return fmt.Errorf("marshal yaml: %w", err)
 		}
-		return os.WriteFile(source.Path, out, 0644)
+		return fsutil.AtomicWriteFile(path, out, 0o644)
 	}
 
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal json: %w", err)
 	}
-	return os.WriteFile(source.Path, append(out, '\n'), 0644)
+	return fsutil.AtomicWriteFile(path, append(out, '\n'), 0o644)
 }
