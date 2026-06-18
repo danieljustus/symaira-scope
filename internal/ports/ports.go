@@ -5,6 +5,7 @@ package ports
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"sort"
 	"syscall"
 
@@ -111,6 +112,51 @@ func Conflicts(ports []model.Port) []model.Conflict {
 		}
 		sort.Strings(hs)
 		out = append(out, model.Conflict{Port: port, Holders: hs})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Port < out[j].Port })
+	return out
+}
+
+// MCPServerConflicts checks whether any MCP server's HTTP URL port is already
+// occupied by a listening process.
+func MCPServerConflicts(servers []model.MCPServer, listening []model.Port) []model.Conflict {
+	occupied := map[int]string{}
+	for _, p := range listening {
+		if p.Protocol == "tcp" {
+			occupied[p.Port] = p.Process
+		}
+	}
+
+	byPort := map[int][]string{}
+	for _, s := range servers {
+		if s.URL == "" {
+			continue
+		}
+		u, err := url.Parse(s.URL)
+		if err != nil {
+			continue
+		}
+		port := 0
+		if u.Port() != "" {
+			fmt.Sscanf(u.Port(), "%d", &port)
+		}
+		if port == 0 {
+			continue
+		}
+		holder := fmt.Sprintf("%s/%s", s.Client, s.Name)
+		if proc, ok := occupied[port]; ok {
+			holder += " (occupied by " + proc + ")"
+		}
+		byPort[port] = append(byPort[port], holder)
+	}
+
+	var out []model.Conflict
+	for port, holders := range byPort {
+		if len(holders) < 2 {
+			continue
+		}
+		sort.Strings(holders)
+		out = append(out, model.Conflict{Port: port, Holders: holders, Kind: "mcp-occupied"})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Port < out[j].Port })
 	return out

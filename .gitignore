@@ -19,3 +19,4 @@ coverage.*
 .github/audit/
 .github/review/
 .omo/
+.worktrees/

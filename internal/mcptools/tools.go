@@ -70,6 +70,27 @@ func Register(srv *mcpserver.Server) {
 			return ports.Conflicts(p), nil
 		},
 	})
+	srv.RegisterTool(&mcpserver.Tool{
+		Name:        "mcp_health",
+		Description: "Health-check discovered MCP servers (without probing, just lists them).",
+		InputSchema: json.RawMessage(emptyObject),
+		Handler: func(_ context.Context, _ json.RawMessage) (any, error) {
+			servers := mcpcfg.Discover(mcpcfg.DefaultSources())
+			results := make([]struct {
+				Name   string `json:"name"`
+				Client string `json:"client"`
+				Status string `json:"status"`
+			}, len(servers))
+			for i, s := range servers {
+				results[i] = struct {
+					Name   string `json:"name"`
+					Client string `json:"client"`
+					Status string `json:"status"`
+				}{Name: s.Name, Client: s.Client, Status: "unknown"}
+			}
+			return results, nil
+		},
+	})
 }
 
 // Serve starts the MCP server on stdio with graceful shutdown.

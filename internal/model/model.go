@@ -22,13 +22,15 @@ type Port struct {
 
 // MCPServer is one MCP server discovered in an AI client's configuration.
 type MCPServer struct {
-	Name       string   `json:"name"`
-	Client     string   `json:"client"`    // claude-desktop, cursor, vscode, ...
-	Transport  string   `json:"transport"` // stdio | http | sse
-	Command    string   `json:"command,omitempty"`
-	Args       []string `json:"args,omitempty"`
-	URL        string   `json:"url,omitempty"`
-	ConfigPath string   `json:"config_path"`
+	Name        string            `json:"name"`
+	Client      string            `json:"client"`    // claude-desktop, cursor, vscode, ...
+	Transport   string            `json:"transport"` // stdio | http | sse
+	Command     string            `json:"command,omitempty"`
+	Args        []string          `json:"args,omitempty"`
+	URL         string            `json:"url,omitempty"`
+	ConfigPath  string            `json:"config_path"`
+	Env         map[string]string `json:"env,omitempty"`
+	SecretBacked bool             `json:"secret_backed,omitempty"`
 }
 
 // Container is a running container and its published ports.
@@ -39,10 +41,21 @@ type Container struct {
 	Ports []int  `json:"ports"`
 }
 
-// Conflict is a port bound by more than one process.
+// MCPHealthResult reports whether an MCP server responds to an initialize probe.
+type MCPHealthResult struct {
+	Name      string `json:"name"`
+	Client    string `json:"client"`
+	Status    string `json:"status"` // healthy | unhealthy | unknown
+	LatencyMs int64  `json:"latency_ms"`
+	Error     string `json:"error,omitempty"`
+}
+
+// Conflict is a port bound by more than one process or occupied by a
+// configured service.
 type Conflict struct {
 	Port    int      `json:"port"`
 	Holders []string `json:"holders"`
+	Kind    string   `json:"kind"` // process-process | mcp-occupied
 }
 
 // ClientConfig reports whether a known AI client's MCP config file is present.
@@ -51,3 +64,5 @@ type ClientConfig struct {
 	Path    string `json:"path"`
 	Present bool   `json:"present"`
 }
+
+
