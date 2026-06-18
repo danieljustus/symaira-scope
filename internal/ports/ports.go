@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/url"
 	"sort"
+	"sync"
+	"sync/atomic"
 	"syscall"
 
 	psnet "github.com/shirou/gopsutil/v4/net"
@@ -72,10 +74,65 @@ func ListListening() ([]model.Port, error) {
 }
 
 // SuggestFree returns up to count TCP ports in [from, to] that can be bound now.
+// Ports are tested concurrently for faster results on large ranges.
 func SuggestFree(count, from, to int) []int {
 	if count <= 0 {
 		count = 1
 	}
+
+	total := to - from + 1
+	if total <= 0 {
+		return nil
+	}
+
+	// For small ranges, sequential scanning is faster than spawning goroutines.
+	if total <= 64 {
+		return suggestFreeSequential(count, from, to)
+	}
+
+	var free []int
+	var mu sync.Mutex
+	var found atomic.Int32
+	var wg sync.WaitGroup
+
+	workers := 8
+	if workers > total {
+		workers = total
+	}
+
+	ch := make(chan int, total)
+	for p := from; p <= to; p++ {
+		ch <- p
+	}
+	close(ch)
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for p := range ch {
+				if int(found.Load()) >= count {
+					return
+				}
+				l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
+				if err == nil {
+					_ = l.Close()
+					mu.Lock()
+					if len(free) < count {
+						free = append(free, p)
+						found.Add(1)
+					}
+					mu.Unlock()
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	return free
+}
+
+func suggestFreeSequential(count, from, to int) []int {
 	var free []int
 	for p := from; p <= to && len(free) < count; p++ {
 		l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
