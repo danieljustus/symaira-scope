@@ -1,0 +1,21 @@
+# Binaries
+/symscope
+/dist/
+*.exe
+
+# Test / coverage
+*.out
+coverage.*
+
+# macOS
+.DS_Store
+
+# Local config / secrets
+.env
+*.local.toml
+
+# Orchestration / agent scratch
+.sisyphus/
+.github/audit/
+.github/review/
+.omo/
