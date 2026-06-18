@@ -12,6 +12,7 @@ import (
 	"github.com/danieljustus/symaira-corekit/mcpserver"
 
 	"github.com/danieljustus/symaira-scope/internal/mcpcfg"
+	"github.com/danieljustus/symaira-scope/internal/mcphealth"
 	"github.com/danieljustus/symaira-scope/internal/ports"
 	"github.com/danieljustus/symaira-scope/internal/scan"
 )
@@ -72,23 +73,11 @@ func Register(srv *mcpserver.Server) {
 	})
 	srv.RegisterTool(&mcpserver.Tool{
 		Name:        "mcp_health",
-		Description: "Health-check discovered MCP servers (without probing, just lists them).",
+		Description: "Health-check discovered MCP servers by probing each one. Spawns processes or makes HTTP requests to verify servers respond.",
 		InputSchema: json.RawMessage(emptyObject),
 		Handler: func(_ context.Context, _ json.RawMessage) (any, error) {
 			servers := mcpcfg.Discover(mcpcfg.DefaultSources())
-			results := make([]struct {
-				Name   string `json:"name"`
-				Client string `json:"client"`
-				Status string `json:"status"`
-			}, len(servers))
-			for i, s := range servers {
-				results[i] = struct {
-					Name   string `json:"name"`
-					Client string `json:"client"`
-					Status string `json:"status"`
-				}{Name: s.Name, Client: s.Client, Status: "unknown"}
-			}
-			return results, nil
+			return mcphealth.ProbeAll(servers), nil
 		},
 	})
 }
