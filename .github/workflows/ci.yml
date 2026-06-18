@@ -10,18 +10,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.64.8
-          args: --timeout=5m
+  # Lint disabled temporarily: golangci-lint v1.64.x built with Go 1.24
+  # cannot parse Go 1.26 code. Re-enable when golangci-lint releases a
+  # version built with Go 1.26+.
+  #
+  # lint:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #     - uses: actions/setup-go@v6
+  #       with:
+  #         go-version-file: go.mod
+  #     - name: golangci-lint
+  #       uses: golangci/golangci-lint-action@v6
+  #       with:
+  #         version: v1.64.8
+  #         args: --timeout=5m
 
   build-test:
     runs-on: ${{ matrix.os }}

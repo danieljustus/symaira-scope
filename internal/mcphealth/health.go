@@ -8,53 +8,19 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
-	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/danieljustus/symaira-scope/internal/model"
 )
 
-var probeTimeout = 5 * time.Second
-
-type jsonrpcRequest struct {
-	JSONRPC string        `json:"jsonrpc"`
-	ID      int           `json:"id"`
-	Method  string        `json:"method"`
-	Params  requestParams `json:"params"`
-}
-
-type requestParams struct {
-	ProtocolVersion string         `json:"protocolVersion"`
-	Capabilities    map[string]any `json:"capabilities"`
-	ClientInfo      clientInfo     `json:"clientInfo"`
-}
-
-type clientInfo struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-}
-
-func initRequest() jsonrpcRequest {
-	return jsonrpcRequest{
-		JSONRPC: "2.0",
-		ID:      1,
-		Method:  "initialize",
-		Params: requestParams{
-			ProtocolVersion: "2024-11-05",
-			Capabilities:    map[string]any{},
-			ClientInfo:      clientInfo{Name: "symscope", Version: "0.2.0"},
-		},
-	}
-}
+const probeTimeout = 5 * time.Second
 
 func ProbeAll(servers []model.MCPServer) []model.MCPHealthResult {
 	results := make([]model.MCPHealthResult, len(servers))
 	for i, s := range servers {
-		switch s.Transport {
-		case "http", "sse":
+		if s.Transport == "http" || s.Transport == "sse" {
 			results[i] = ProbeHTTP(s.URL)
-		default:
+		} else {
 			results[i] = ProbeStdio(s.Command, s.Args)
 		}
 		results[i].Name = s.Name
@@ -72,7 +38,7 @@ func ProbeStdio(cmd string, args []string) model.MCPHealthResult {
 	defer cancel()
 
 	c := exec.CommandContext(ctx, cmd, args...)
-	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setProcAttr(c)
 
 	stdin, err := c.StdinPipe()
 	if err != nil {
@@ -93,69 +59,23 @@ func ProbeStdio(cmd string, args []string) model.MCPHealthResult {
 	start := time.Now()
 	if _, err := stdin.Write(reqBytes); err != nil {
 		killProcess(c)
-		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("write: %v", err), LatencyMs: time.Since(start).Milliseconds()}
+		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("write: %v", err)}
 	}
 	stdin.Close()
 
-	respBytes, err := io.ReadAll(stdout)
+	var buf bytes.Buffer
+	io.Copy(&buf, stdout)
 	elapsed := time.Since(start).Milliseconds()
 
 	killProcess(c)
 
-	if err != nil {
-		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("read: %v", err), LatencyMs: elapsed}
-	}
-
-	var resp map[string]any
-	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("invalid json response: %v", err), LatencyMs: elapsed}
-	}
-
-	if _, ok := resp["result"]; ok {
-		return model.MCPHealthResult{Status: "healthy", LatencyMs: elapsed}
-	}
-
-	return model.MCPHealthResult{Status: "unhealthy", Error: "no result field in response", LatencyMs: elapsed}
-}
-
-func ProbeHTTP(url string) model.MCPHealthResult {
-	if url == "" {
-		return model.MCPHealthResult{Status: "unknown", Error: "no url"}
-	}
-
-	req := initRequest()
-	reqBytes, _ := json.Marshal(req)
-
-	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
-	defer cancel()
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(reqBytes))
-	if err != nil {
-		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("request: %v", err)}
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	start := time.Now()
-	resp, err := http.DefaultClient.Do(httpReq)
-	elapsed := time.Since(start).Milliseconds()
-
-	if err != nil {
-		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("post: %v", err), LatencyMs: elapsed}
-	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("read body: %v", err), LatencyMs: elapsed}
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("status %d", resp.StatusCode), LatencyMs: elapsed}
+	if ctx.Err() == context.DeadlineExceeded {
+		return model.MCPHealthResult{Status: "unhealthy", Error: "timeout", LatencyMs: elapsed}
 	}
 
 	var rpcResp map[string]any
-	if err := json.Unmarshal(respBytes, &rpcResp); err != nil {
-		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("invalid json: %v", err), LatencyMs: elapsed}
+	if err := json.Unmarshal(buf.Bytes(), &rpcResp); err != nil {
+		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("parse: %v", err), LatencyMs: elapsed}
 	}
 
 	if _, ok := rpcResp["result"]; ok {
@@ -165,11 +85,56 @@ func ProbeHTTP(url string) model.MCPHealthResult {
 	return model.MCPHealthResult{Status: "unhealthy", Error: "no result field in response", LatencyMs: elapsed}
 }
 
-func killProcess(c *exec.Cmd) {
-	if runtime.GOOS == "windows" {
-		c.Process.Kill()
-	} else {
-		syscall.Kill(-c.Process.Pid, syscall.SIGTERM)
+func ProbeHTTP(url string) model.MCPHealthResult {
+	if url == "" {
+		return model.MCPHealthResult{Status: "unknown", Error: "no URL"}
 	}
-	c.Wait()
+
+	req := initRequest()
+	reqBytes, _ := json.Marshal(req)
+
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBytes))
+	if err != nil {
+		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("request: %v", err)}
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	start := time.Now()
+	resp, err := http.DefaultClient.Do(httpReq)
+	elapsed := time.Since(start).Milliseconds()
+	if err != nil {
+		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("do: %v", err), LatencyMs: elapsed}
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var rpcResp map[string]any
+	if err := json.Unmarshal(body, &rpcResp); err != nil {
+		return model.MCPHealthResult{Status: "unhealthy", Error: fmt.Sprintf("parse: %v", err), LatencyMs: elapsed}
+	}
+
+	if _, ok := rpcResp["result"]; ok {
+		return model.MCPHealthResult{Status: "healthy", LatencyMs: elapsed}
+	}
+
+	return model.MCPHealthResult{Status: "unhealthy", Error: "no result field in response", LatencyMs: elapsed}
+}
+
+func initRequest() map[string]any {
+	return map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "initialize",
+		"params": map[string]any{
+			"protocolVersion": "2024-11-05",
+			"capabilities":    map[string]any{},
+			"clientInfo": map[string]any{
+				"name":    "symscope",
+				"version": "0.2.0",
+			},
+		},
+	}
 }
