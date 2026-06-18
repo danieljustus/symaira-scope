@@ -16,6 +16,7 @@ import (
 	"github.com/danieljustus/symaira-corekit/updatecheck"
 
 	"github.com/danieljustus/symaira-scope/internal/cache"
+	"github.com/danieljustus/symaira-scope/internal/config"
 	"github.com/danieljustus/symaira-scope/internal/containers"
 	"github.com/danieljustus/symaira-scope/internal/explain"
 	"github.com/danieljustus/symaira-scope/internal/mcphealth"
@@ -121,12 +122,24 @@ func newPortsCmd() *cobra.Command {
 		Use:   "suggest",
 		Short: "Suggest free TCP ports in a range",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				slog.Warn("config load failed, using defaults", "err", err)
+				cfg = config.Defaults()
+			}
+			fromVal, toVal := cfg.Ports.SuggestFrom, cfg.Ports.SuggestTo
+			if from == 3000 {
+				from = fromVal
+			}
+			if to == 9999 {
+				to = toVal
+			}
 			return printJSON(map[string]any{"free": ports.SuggestFree(count, from, to)})
 		},
 	}
 	suggest.Flags().IntVar(&count, "count", 3, "How many free ports to suggest")
-	suggest.Flags().IntVar(&from, "from", 3000, "Range start")
-	suggest.Flags().IntVar(&to, "to", 9999, "Range end")
+	suggest.Flags().IntVar(&from, "from", 3000, "Range start (default from config)")
+	suggest.Flags().IntVar(&to, "to", 9999, "Range end (default from config)")
 	cmd.AddCommand(suggest)
 
 	return cmd
