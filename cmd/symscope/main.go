@@ -15,6 +15,7 @@ import (
 	"github.com/danieljustus/symaira-corekit/logkit"
 	"github.com/danieljustus/symaira-corekit/updatecheck"
 
+	"github.com/danieljustus/symaira-scope/internal/cache"
 	"github.com/danieljustus/symaira-scope/internal/containers"
 	"github.com/danieljustus/symaira-scope/internal/mcpcfg"
 	"github.com/danieljustus/symaira-scope/internal/mcptools"
@@ -57,6 +58,7 @@ an MCP server for agents.`,
 		newClientsCmd(),
 		newContainersCmd(),
 		newConflictsCmd(),
+		newCacheCmd(),
 		newServeCmd(),
 		newVersionCmd(),
 	)
@@ -64,17 +66,35 @@ an MCP server for agents.`,
 }
 
 func newScanCmd() *cobra.Command {
-	return &cobra.Command{
+	var noCache bool
+	cmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Full inventory snapshot (ports + MCP servers + containers)",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			if !noCache {
+				if snap, err := cache.Load(); err != nil {
+					return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "cache load")
+				} else if snap != nil {
+					return printJSON(snap)
+				}
+			}
+
 			snap, err := scan.Build()
 			if err != nil {
 				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "scan")
 			}
+
+			if !noCache {
+				if err := cache.Save(&snap); err != nil {
+					slog.Warn("cache save failed", "err", err)
+				}
+			}
+
 			return printJSON(snap)
 		},
 	}
+	cmd.Flags().BoolVar(&noCache, "no-cache", false, "Skip cache; always run a fresh scan")
+	return cmd
 }
 
 func newPortsCmd() *cobra.Command {
@@ -146,15 +166,52 @@ func newContainersCmd() *cobra.Command {
 func newConflictsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "conflicts",
-		Short: "Report ports bound by more than one process",
+		Short: "Report ports bound by more than one process or occupied by configured services",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			p, err := ports.ListListening()
 			if err != nil {
 				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "list ports")
 			}
-			return printJSON(ports.Conflicts(p))
+			all := ports.Conflicts(p)
+			servers := mcpcfg.Discover(mcpcfg.DefaultSources())
+			all = append(all, ports.MCPServerConflicts(servers, p)...)
+			return printJSON(all)
 		},
 	}
+}
+
+func newCacheCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "cache", Short: "Inspect or manage the snapshot cache"}
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "show",
+		Short: "Show cache status and metadata",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return printJSON(cache.Stats())
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "clear",
+		Short: "Delete the snapshot cache file",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if err := cache.Clear(); err != nil {
+				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "cache clear")
+			}
+			fmt.Println("Cache cleared.")
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "stats",
+		Short: "Print cache statistics as JSON",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return printJSON(cache.Stats())
+		},
+	})
+
+	return cmd
 }
 
 func newServeCmd() *cobra.Command {
