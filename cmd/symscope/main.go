@@ -18,8 +18,10 @@ import (
 	"github.com/danieljustus/symaira-scope/internal/cache"
 	"github.com/danieljustus/symaira-scope/internal/containers"
 	"github.com/danieljustus/symaira-scope/internal/explain"
+	"github.com/danieljustus/symaira-scope/internal/mcphealth"
 	"github.com/danieljustus/symaira-scope/internal/mcpcfg"
 	"github.com/danieljustus/symaira-scope/internal/mcptools"
+	"github.com/danieljustus/symaira-scope/internal/model"
 	"github.com/danieljustus/symaira-scope/internal/ports"
 	"github.com/danieljustus/symaira-scope/internal/scan"
 )
@@ -201,6 +203,25 @@ func newMCPCmd() *cobra.Command {
 	rmCmd.MarkFlagRequired("name")
 	rmCmd.MarkFlagRequired("client")
 	cmd.AddCommand(rmCmd)
+
+	var probe bool
+	health := &cobra.Command{
+		Use:   "health",
+		Short: "Health-check discovered MCP servers",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			servers := mcpcfg.Discover(mcpcfg.DefaultSources())
+			if !probe {
+				results := make([]model.MCPHealthResult, len(servers))
+				for i, s := range servers {
+					results[i] = model.MCPHealthResult{Name: s.Name, Client: s.Client, Status: "unknown"}
+				}
+				return printJSON(results)
+			}
+			return printJSON(mcphealth.ProbeAll(servers))
+		},
+	}
+	health.Flags().BoolVar(&probe, "probe", false, "actually probe each server (spawns processes / makes HTTP requests)")
+	cmd.AddCommand(health)
 
 	return cmd
 }
