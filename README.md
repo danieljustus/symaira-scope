@@ -10,9 +10,9 @@ or "give me three free ports" itself.
 
 Part of the [Symaira](../ECOSYSTEM.md) family (Go core, MIT, corekit-based).
 
-> **Status: v0.1 scaffold.** Builds, tests pass. Ports/MCP-discovery/conflicts/
-> free-port-suggest work; container discovery is an honest stub. Not released yet.
-> This is the Go successor to the earlier Rust `OpenScope` prototype.
+> **Status: v0.1.0** — first public release. Ports, MCP-discovery, Docker containers,
+> conflicts, caching, health probes, and more all work. Cross-platform (macOS,
+> Linux, Windows). This is the Go successor to the earlier Rust `OpenScope` prototype.
 
 ## Install (from source)
 
@@ -30,7 +30,7 @@ symscope ports list        # listening TCP/UDP ports + owning process
 symscope ports suggest     # free TCP ports  (--count --from --to)
 symscope mcp list          # MCP servers discovered across AI clients
 symscope clients list      # which AI clients have an MCP config present
-symscope containers        # running containers (stub in v0.1)
+symscope containers        # running containers with published ports
 symscope conflicts         # ports bound by more than one process
 symscope serve             # run the MCP stdio server for agents
 symscope version [--check]
