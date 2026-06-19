@@ -7,6 +7,7 @@ version: 2
 builds:
   - id: symscope
     binary: symscope
+    main: ./cmd/symscope
     env:
       - CGO_ENABLED=0
     goos:
@@ -21,10 +22,10 @@ builds:
 
 archives:
   - id: default
-    format: tar.gz
+    formats: ["tar.gz"]
     format_overrides:
       - goos: windows
-        format: zip
+        formats: ["zip"]
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
 
