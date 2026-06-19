@@ -1,10 +1,55 @@
 version: 2
 updates:
-  - package-ecosystem: gomod
-    directory: /
+  - package-ecosystem: "gomod"
+    directory: "/"
     schedule:
-      interval: weekly
-  - package-ecosystem: github-actions
-    directory: /
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    target-branch: "main"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps(dev)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "go"
+    groups:
+      go-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      go-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+    # Security updates are issued immediately by Dependabot regardless of
+    # the schedule above, so security PRs are not blocked by `groups`.
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
-      interval: weekly
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    target-branch: "main"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      actions-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
