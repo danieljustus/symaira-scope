@@ -2,9 +2,9 @@ package containers
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -185,41 +185,35 @@ func TestParsePsStream_malformed(t *testing.T) {
 }
 
 // TestRun_propagatesStderr ensures the run helper includes the CLI's
-// stderr in the error message.
+// stderr in the error message. The test invokes a real subprocess that
+// writes a known marker to stderr and exits non-zero, so the test exercises
+// the full error path on every supported OS.
 func TestRun_propagatesStderr(t *testing.T) {
-	if _, err := exec.LookPath("false"); err != nil {
-		t.Skip("`false` binary not available, skipping:", err)
+	var bin string
+	var args []string
+	const marker = "SYMSCOPE_TEST_STDERR_MARKER"
+	if runtime.GOOS == "windows" {
+		// `cmd.exe /c "echo MARKER 1>&2 && exit 1"`.
+		bin = "cmd.exe"
+		args = []string{"/c", "echo " + marker + " 1>&2 && exit 1"}
+	} else {
+		// `sh -c 'echo MARKER >&2; exit 1'`.
+		bin = "sh"
+		args = []string{"-c", "echo " + marker + " >&2; exit 1"}
+	}
+	if _, err := exec.LookPath(bin); err != nil {
+		t.Skipf("%q not on PATH, skipping: %v", bin, err)
 	}
 
-	tmp := t.TempDir()
 	prev := cli
-	cli = filepath.Join(tmp, "false")
-	// Create a symlink to the real `false` so the subprocess can execute.
-	if err := os.Symlink(lookupFalse(t), cli); err != nil {
-		t.Skip("could not create false symlink, skipping:", err)
-	}
+	cli = bin
 	t.Cleanup(func() { cli = prev })
 
-	_, err := run(context.Background())
+	_, err := run(context.Background(), args...)
 	if err == nil {
-		t.Fatal("expected error from `false` exit code 1, got nil")
+		t.Fatal("expected error from failing subprocess, got nil")
 	}
-	if !strings.Contains(err.Error(), "exit status 1") &&
-		!strings.Contains(err.Error(), "exit code") {
-		t.Errorf("error should mention the exit code, got: %v", err)
+	if !strings.Contains(err.Error(), marker) {
+		t.Errorf("error should contain the subprocess stderr marker %q, got: %v", marker, err)
 	}
-}
-
-// lookupFalse returns the absolute path to the `false` binary.
-func lookupFalse(t *testing.T) string {
-	t.Helper()
-	p, err := exec.LookPath("false")
-	if err != nil {
-		t.Fatalf("`false` not on PATH: %v", err)
-	}
-	abs, err := filepath.Abs(p)
-	if err != nil {
-		t.Fatalf("`false` abs path: %v", err)
-	}
-	return abs
 }
