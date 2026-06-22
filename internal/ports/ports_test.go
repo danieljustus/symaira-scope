@@ -2,6 +2,7 @@ package ports
 
 import (
 	"fmt"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -152,5 +153,117 @@ func TestListListeningPropagatesError(t *testing.T) {
 	_, err := listListeningWith(lister)
 	if err == nil {
 		t.Fatal("expected error to propagate")
+	}
+}
+
+func TestMCPServerConflictsNoConflict(t *testing.T) {
+	servers := []model.MCPServer{
+		{Name: "s1", Client: "c", URL: "http://localhost:3000"},
+	}
+	listening := []model.Port{
+		{Port: 8080, Protocol: "tcp", Process: "nginx"},
+	}
+	got := MCPServerConflicts(servers, listening)
+	if len(got) != 0 {
+		t.Fatalf("expected no conflicts, got %v", got)
+	}
+}
+
+func TestMCPServerConflictsSingleConflict(t *testing.T) {
+	servers := []model.MCPServer{
+		{Name: "s1", Client: "c1", URL: "http://localhost:8080"},
+		{Name: "s2", Client: "c2", URL: "http://localhost:8080"},
+	}
+	listening := []model.Port{
+		{Port: 8080, Protocol: "tcp", Process: "nginx"},
+	}
+	got := MCPServerConflicts(servers, listening)
+	if len(got) != 1 || got[0].Port != 8080 {
+		t.Fatalf("expected conflict on 8080, got %v", got)
+	}
+	if got[0].Kind != "mcp-occupied" {
+		t.Errorf("kind: want %q, got %q", "mcp-occupied", got[0].Kind)
+	}
+}
+
+func TestMCPServerConflictsMultipleServersSamePort(t *testing.T) {
+	servers := []model.MCPServer{
+		{Name: "s1", Client: "c1", URL: "http://localhost:3000"},
+		{Name: "s2", Client: "c2", URL: "http://localhost:3000"},
+	}
+	listening := []model.Port{
+		{Port: 3000, Protocol: "tcp", Process: "node"},
+	}
+	got := MCPServerConflicts(servers, listening)
+	if len(got) != 1 || got[0].Port != 3000 {
+		t.Fatalf("expected conflict on 3000, got %v", got)
+	}
+	if len(got[0].Holders) != 2 {
+		t.Errorf("expected 2 holders, got %d: %v", len(got[0].Holders), got[0].Holders)
+	}
+}
+
+func TestMCPServerConflictsSkipsEmptyURL(t *testing.T) {
+	servers := []model.MCPServer{
+		{Name: "stdio-server", Client: "c", Command: "node"},
+	}
+	listening := []model.Port{
+		{Port: 8080, Protocol: "tcp", Process: "node"},
+	}
+	got := MCPServerConflicts(servers, listening)
+	if len(got) != 0 {
+		t.Fatalf("empty URL should not conflict, got %v", got)
+	}
+}
+
+func TestMCPServerConflictsSkipsInvalidURL(t *testing.T) {
+	servers := []model.MCPServer{
+		{Name: "bad", Client: "c", URL: "not-a-url"},
+	}
+	listening := []model.Port{
+		{Port: 80, Protocol: "tcp", Process: "http"},
+	}
+	got := MCPServerConflicts(servers, listening)
+	if len(got) != 0 {
+		t.Fatalf("invalid URL should skip gracefully, got %v", got)
+	}
+}
+
+func TestMCPServerConflictsSkipsPortZero(t *testing.T) {
+	servers := []model.MCPServer{
+		{Name: "s", Client: "c", URL: "http://localhost"},
+	}
+	listening := []model.Port{
+		{Port: 80, Protocol: "tcp", Process: "http"},
+	}
+	got := MCPServerConflicts(servers, listening)
+	if len(got) != 0 {
+		t.Fatalf("port 0 (or missing) should skip, got %v", got)
+	}
+}
+
+func TestMCPServerConflictsEmptyInputs(t *testing.T) {
+	got := MCPServerConflicts(nil, nil)
+	if len(got) != 0 {
+		t.Fatalf("empty inputs should return no conflicts, got %v", got)
+	}
+}
+
+func TestMCPServerConflictsAnnotatesOccupied(t *testing.T) {
+	servers := []model.MCPServer{
+		{Name: "s1", Client: "cursor", URL: "http://localhost:9000"},
+		{Name: "s2", Client: "vscode", URL: "http://localhost:9000"},
+	}
+	listening := []model.Port{
+		{Port: 9000, Protocol: "tcp", Process: "myapp"},
+	}
+	got := MCPServerConflicts(servers, listening)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 conflict, got %d", len(got))
+	}
+	for _, h := range got[0].Holders {
+		if !strings.Contains(h, "occupied by myapp") {
+			t.Errorf("holder %q should annotate occupied process", h)
+		}
 	}
 }
