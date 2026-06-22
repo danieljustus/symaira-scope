@@ -100,18 +100,19 @@ func SuggestFree(count, from, to int) []int {
 		workers = total
 	}
 
-	ch := make(chan int, total)
-	for p := from; p <= to; p++ {
-		ch <- p
-	}
-	close(ch)
+	var next atomic.Int32
+	next.Store(int32(from))
 
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for p := range ch {
+			for {
 				if int(found.Load()) >= count {
+					return
+				}
+				p := int(next.Add(1) - 1)
+				if p > to {
 					return
 				}
 				l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
