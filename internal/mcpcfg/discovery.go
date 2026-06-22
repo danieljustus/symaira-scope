@@ -277,19 +277,30 @@ func RemoveServer(source Source, name string) error {
 // writeConfig marshals the document to the appropriate format and writes it
 // atomically. The original file is preserved until the write succeeds,
 // preventing corruption on crash or interrupt.
+//
+// When overwriting an existing config file the original mode is preserved so
+// that restrictive permissions (e.g. 0o600 for files containing secrets) are
+// not silently widened. New files default to 0o600.
 func writeConfig(path string, doc map[string]any) error {
+	// Preserve the existing file's permissions; default to 0o600 for new files
+	// so that AI client configs containing env secrets are not world-readable.
+	perm := os.FileMode(0o600)
+	if info, err := os.Stat(path); err == nil {
+		perm = info.Mode().Perm()
+	}
+
 	ext := strings.ToLower(filepath.Ext(path))
 	if ext == ".yaml" || ext == ".yml" {
 		out, err := yaml.Marshal(doc)
 		if err != nil {
 			return fmt.Errorf("marshal yaml: %w", err)
 		}
-		return fsutil.AtomicWriteFile(path, out, 0o644)
+		return fsutil.AtomicWriteFile(path, out, perm)
 	}
 
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal json: %w", err)
 	}
-	return fsutil.AtomicWriteFile(path, append(out, '\n'), 0o644)
+	return fsutil.AtomicWriteFile(path, append(out, '\n'), perm)
 }
