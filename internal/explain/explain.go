@@ -26,24 +26,29 @@ type ProcessInfo struct {
 }
 
 type MCPServerInfo struct {
-	Name      string `json:"name"`
-	Client    string `json:"client"`
-	Transport string `json:"transport"`
-	URL       string `json:"url,omitempty"`
-	Command   string `json:"command,omitempty"`
+	Name       string `json:"name"`
+	Client     string `json:"client"`
+	Transport  string `json:"transport"`
+	URL        string `json:"url,omitempty"`
+	Command    string `json:"command,omitempty"`
 	ConfigPath string `json:"config_path"`
 }
 
 type ServerExplanation struct {
-	Name       string         `json:"name"`
-	Client     string         `json:"client"`
-	Server     model.MCPServer `json:"server"`
-	Occupied   *model.Port    `json:"occupied_port,omitempty"`
-	Conflict   *model.Conflict `json:"conflict,omitempty"`
+	Name     string          `json:"name"`
+	Client   string          `json:"client"`
+	Server   model.MCPServer `json:"server"`
+	Occupied *model.Port     `json:"occupied_port,omitempty"`
+	Conflict *model.Conflict `json:"conflict,omitempty"`
 }
 
+var (
+	listListeningFn = ports.ListListening
+	discoverFn      = mcpcfg.Discover
+)
+
 func ExplainPort(portNum int) (*PortExplanation, error) {
-	listening, err := ports.ListListening()
+	listening, err := listListeningFn()
 	if err != nil {
 		return nil, fmt.Errorf("list ports: %w", err)
 	}
@@ -61,7 +66,7 @@ func ExplainPort(portNum int) (*PortExplanation, error) {
 		}
 	}
 
-	servers, _ := mcpcfg.Discover(mcpcfg.DefaultSources())
+	servers, _ := discoverFn(mcpcfg.DefaultSources())
 	for _, s := range servers {
 		if s.URL == "" {
 			continue
@@ -100,7 +105,7 @@ func ExplainPort(portNum int) (*PortExplanation, error) {
 }
 
 func ExplainServer(name string) (*ServerExplanation, error) {
-	servers, _ := mcpcfg.Discover(mcpcfg.DefaultSources())
+	servers, _ := discoverFn(mcpcfg.DefaultSources())
 
 	var found *model.MCPServer
 	for _, s := range servers {
@@ -127,7 +132,7 @@ func ExplainServer(name string) (*ServerExplanation, error) {
 				port, _ = strconv.Atoi(u.Port())
 			}
 			if port > 0 {
-				listening, err := ports.ListListening()
+				listening, err := listListeningFn()
 				if err == nil {
 					for _, p := range listening {
 						if p.Port == port {
