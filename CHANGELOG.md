@@ -13,7 +13,7 @@ Docker-published ports, and MCP servers configured across AI clients.
 ### Features
 - Full port inventory: listening TCP/UDP ports with owning process via gopsutil
 - Free port suggestion (`ports suggest --count N --from --to`)
-- Docker container discovery via official Docker client SDK
+- Docker container discovery via local Docker CLI
 - MCP server discovery across Claude Desktop/Code, Cursor, VS Code, Windsurf,
   Goose, Cline, Continue, Aider, Roo Code, Zed, and project-local `.mcp.json`
 - MCP stdio server (`serve`) with tools: `scan`, `ports_list`, `ports_suggest`,
