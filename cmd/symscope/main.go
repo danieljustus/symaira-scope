@@ -354,9 +354,11 @@ func newCacheCmd() *cobra.Command {
 	})
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "stats",
-		Short: "Print cache statistics as JSON",
+		Use:    "stats",
+		Short:  "Print cache statistics as JSON",
+		Hidden: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
+			fmt.Fprintln(os.Stderr, "warning: 'cache stats' is deprecated, use 'cache show' instead")
 			return printJSON(cache.Stats())
 		},
 	})
