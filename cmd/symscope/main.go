@@ -177,6 +177,9 @@ func newMCPCmd() *cobra.Command {
 			if source == nil {
 				return exitcodes.Wrap(fmt.Errorf("unknown client %q", addClient), exitcodes.ExitConfig, exitcodes.KindValidation, "mcp add")
 			}
+			if addCommand == "" && addURL == "" {
+				return exitcodes.Wrap(fmt.Errorf("at least one of --command or --url is required"), exitcodes.ExitConfig, exitcodes.KindValidation, "mcp add")
+			}
 			if err := mcpcfg.AddServer(*source, addName, mcpcfg.Entry{Command: addCommand, Args: addArgs, URL: addURL}); err != nil {
 				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "mcp add")
 			}
