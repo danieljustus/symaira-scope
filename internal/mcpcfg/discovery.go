@@ -183,11 +183,25 @@ func Discover(sources []Source) ([]model.MCPServer, []string) {
 }
 
 // FoundClients reports which known client configs are present on disk.
+// Glob patterns in source paths are expanded so that clients like roo-code
+// (which use wildcard extension paths) are correctly detected.
 func FoundClients(sources []Source) []model.ClientConfig {
-	out := make([]model.ClientConfig, 0, len(sources))
+	seen := map[string]bool{}
+	var out []model.ClientConfig
 	for _, s := range sources {
-		_, err := os.Stat(s.Path)
-		out = append(out, model.ClientConfig{Client: s.Client, Path: s.Path, Present: err == nil})
+		if seen[s.Client] {
+			continue
+		}
+		expanded := expandGlob(s)
+		present := false
+		for _, e := range expanded {
+			if _, err := os.Stat(e.Path); err == nil {
+				present = true
+				break
+			}
+		}
+		seen[s.Client] = true
+		out = append(out, model.ClientConfig{Client: s.Client, Path: s.Path, Present: present})
 	}
 	return out
 }
