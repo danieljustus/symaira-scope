@@ -121,18 +121,17 @@ func newPortsCmd() *cobra.Command {
 	suggest := &cobra.Command{
 		Use:   "suggest",
 		Short: "Suggest free TCP ports in a range",
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := config.Load()
 			if err != nil {
 				slog.Warn("config load failed, using defaults", "err", err)
 				cfg = config.Defaults()
 			}
-			fromVal, toVal := cfg.Ports.SuggestFrom, cfg.Ports.SuggestTo
-			if from == 3000 {
-				from = fromVal
+			if !cmd.Flags().Changed("from") {
+				from = cfg.Ports.SuggestFrom
 			}
-			if to == 9999 {
-				to = toVal
+			if !cmd.Flags().Changed("to") {
+				to = cfg.Ports.SuggestTo
 			}
 			return printJSON(map[string]any{"free": ports.SuggestFree(count, from, to)})
 		},
@@ -177,6 +176,9 @@ func newMCPCmd() *cobra.Command {
 			}
 			if source == nil {
 				return exitcodes.Wrap(fmt.Errorf("unknown client %q", addClient), exitcodes.ExitConfig, exitcodes.KindValidation, "mcp add")
+			}
+			if addCommand == "" && addURL == "" {
+				return exitcodes.Wrap(fmt.Errorf("at least one of --command or --url is required"), exitcodes.ExitConfig, exitcodes.KindValidation, "mcp add")
 			}
 			if err := mcpcfg.AddServer(*source, addName, mcpcfg.Entry{Command: addCommand, Args: addArgs, URL: addURL}); err != nil {
 				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "mcp add")
@@ -352,9 +354,11 @@ func newCacheCmd() *cobra.Command {
 	})
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "stats",
-		Short: "Print cache statistics as JSON",
+		Use:    "stats",
+		Short:  "Print cache statistics as JSON",
+		Hidden: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
+			fmt.Fprintln(os.Stderr, "warning: 'cache stats' is deprecated, use 'cache show' instead")
 			return printJSON(cache.Stats())
 		},
 	})

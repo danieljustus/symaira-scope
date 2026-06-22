@@ -3,7 +3,7 @@
 ## Overview
 
 `symscope` answers "what's running and configured on this machine, for AI dev
-work?" — listening ports, MCP servers across AI clients, and (soon) containers.
+work?" — listening ports, MCP servers across AI clients, and containers.
 It is a CLI and an MCP server sharing one core.
 
 ```
@@ -18,8 +18,9 @@ cmd/symscope (cobra)  →  internal/* services  →  corekit (mcpserver/configki
 - `internal/mcpcfg` — reads well-known AI-client config files and extracts their
   `mcpServers` entries (read-only, no network). `DefaultSources()` is the client
   table; `FoundClients()` reports presence.
-- `internal/containers` — **stub**; future Docker discovery via the official
-  `docker/docker` client.
+- `internal/containers` — discovers running containers by shelling out to the
+  local `docker` CLI (no SDK dependency; gracefully reports when Docker is
+  unavailable).
 - `internal/scan` — aggregates the above into one `model.Snapshot`.
 - `internal/mcptools` — registers MCP tools on a `corekit/mcpserver.Server` and
   serves stdio with graceful shutdown.
