@@ -17,10 +17,29 @@ import (
 	"github.com/danieljustus/symaira-scope/internal/model"
 )
 
+// ConnLister abstracts the connection-enumeration layer so tests can inject
+// mock data without touching real system sockets.
+type ConnLister interface {
+	Connections(kind string) ([]psnet.ConnectionStat, error)
+}
+
+// DefaultConnLister uses gopsutil to enumerate real system sockets.
+var DefaultConnLister ConnLister = &gopsutilConnLister{}
+
+type gopsutilConnLister struct{}
+
+func (g *gopsutilConnLister) Connections(kind string) ([]psnet.ConnectionStat, error) {
+	return psnet.Connections(kind)
+}
+
 // ListListening returns listening TCP sockets and bound UDP sockets, with the
 // owning process where the OS exposes it (some PIDs require elevated rights).
 func ListListening() ([]model.Port, error) {
-	conns, err := psnet.Connections("inet")
+	return listListeningWith(DefaultConnLister)
+}
+
+func listListeningWith(lister ConnLister) ([]model.Port, error) {
+	conns, err := lister.Connections("inet")
 	if err != nil {
 		return nil, fmt.Errorf("enumerate sockets: %w", err)
 	}

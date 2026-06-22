@@ -1,7 +1,11 @@
 package ports
 
 import (
+	"fmt"
+	"syscall"
 	"testing"
+
+	psnet "github.com/shirou/gopsutil/v4/net"
 
 	"github.com/danieljustus/symaira-scope/internal/model"
 )
@@ -46,5 +50,107 @@ func TestConflictsIgnoresPIDZero(t *testing.T) {
 	}
 	if got := Conflicts(in); len(got) != 0 {
 		t.Fatalf("PID 0 must be ignored, got %v", got)
+	}
+}
+
+type fakeConnLister struct {
+	conns []psnet.ConnectionStat
+	err   error
+}
+
+func (f *fakeConnLister) Connections(kind string) ([]psnet.ConnectionStat, error) {
+	return f.conns, f.err
+}
+
+func TestListListeningFiltersNonListenTCP(t *testing.T) {
+	lister := &fakeConnLister{
+		conns: []psnet.ConnectionStat{
+			{Laddr: psnet.Addr{IP: "127.0.0.1", Port: 3000}, Type: uint32(syscall.SOCK_STREAM), Status: "ESTABLISHED", Pid: 100},
+			{Laddr: psnet.Addr{IP: "127.0.0.1", Port: 8080}, Type: uint32(syscall.SOCK_STREAM), Status: "LISTEN", Pid: 200},
+		},
+	}
+	ports, err := listListeningWith(lister)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ports) != 1 || ports[0].Port != 8080 {
+		t.Errorf("expected only LISTEN port 8080, got %v", ports)
+	}
+}
+
+func TestListListeningIncludesUDP(t *testing.T) {
+	lister := &fakeConnLister{
+		conns: []psnet.ConnectionStat{
+			{Laddr: psnet.Addr{IP: "0.0.0.0", Port: 5353}, Type: uint32(syscall.SOCK_DGRAM), Pid: 100},
+		},
+	}
+	ports, err := listListeningWith(lister)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ports) != 1 || ports[0].Port != 5353 || ports[0].Protocol != "udp" {
+		t.Errorf("expected UDP port 5353, got %v", ports)
+	}
+}
+
+func TestListListeningDeduplicatesIdenticalEntries(t *testing.T) {
+	lister := &fakeConnLister{
+		conns: []psnet.ConnectionStat{
+			{Laddr: psnet.Addr{IP: "127.0.0.1", Port: 9090}, Type: uint32(syscall.SOCK_STREAM), Status: "LISTEN", Pid: 1},
+			{Laddr: psnet.Addr{IP: "127.0.0.1", Port: 9090}, Type: uint32(syscall.SOCK_STREAM), Status: "LISTEN", Pid: 1},
+		},
+	}
+	ports, err := listListeningWith(lister)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ports) != 1 {
+		t.Errorf("expected deduplication to 1 port, got %d", len(ports))
+	}
+}
+
+func TestListListeningResolvesProcessName(t *testing.T) {
+	// PID 0 → no process name resolved
+	lister := &fakeConnLister{
+		conns: []psnet.ConnectionStat{
+			{Laddr: psnet.Addr{IP: "127.0.0.1", Port: 80}, Type: uint32(syscall.SOCK_STREAM), Status: "LISTEN", Pid: 0},
+		},
+	}
+	ports, err := listListeningWith(lister)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ports) != 1 || ports[0].PID != 0 || ports[0].Process != "" {
+		t.Errorf("PID 0 should have empty process, got %+v", ports)
+	}
+}
+
+func TestListListeningSortedByPort(t *testing.T) {
+	lister := &fakeConnLister{
+		conns: []psnet.ConnectionStat{
+			{Laddr: psnet.Addr{IP: "127.0.0.1", Port: 9000}, Type: uint32(syscall.SOCK_STREAM), Status: "LISTEN", Pid: 1},
+			{Laddr: psnet.Addr{IP: "127.0.0.1", Port: 1000}, Type: uint32(syscall.SOCK_STREAM), Status: "LISTEN", Pid: 1},
+			{Laddr: psnet.Addr{IP: "127.0.0.1", Port: 5000}, Type: uint32(syscall.SOCK_STREAM), Status: "LISTEN", Pid: 1},
+		},
+	}
+	ports, err := listListeningWith(lister)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ports) != 3 {
+		t.Fatalf("expected 3 ports, got %d", len(ports))
+	}
+	if ports[0].Port != 1000 || ports[1].Port != 5000 || ports[2].Port != 9000 {
+		t.Errorf("ports not sorted: %v", ports)
+	}
+}
+
+func TestListListeningPropagatesError(t *testing.T) {
+	lister := &fakeConnLister{
+		err: fmt.Errorf("permission denied"),
+	}
+	_, err := listListeningWith(lister)
+	if err == nil {
+		t.Fatal("expected error to propagate")
 	}
 }
