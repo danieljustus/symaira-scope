@@ -13,6 +13,7 @@ import (
 
 	"github.com/danieljustus/symaira-scope/internal/mcpcfg"
 	"github.com/danieljustus/symaira-scope/internal/mcphealth"
+	"github.com/danieljustus/symaira-scope/internal/model"
 	"github.com/danieljustus/symaira-scope/internal/ports"
 	"github.com/danieljustus/symaira-scope/internal/scan"
 )
@@ -74,10 +75,21 @@ func Register(srv *mcpserver.Server) {
 	})
 	srv.RegisterTool(&mcpserver.Tool{
 		Name:        "mcp_health",
-		Description: "Health-check discovered MCP servers by probing each one. Spawns processes or makes HTTP requests to verify servers respond.",
-		InputSchema: json.RawMessage(emptyObject),
-		Handler: func(_ context.Context, _ json.RawMessage) (any, error) {
+		Description: "Report health status of discovered MCP servers. By default returns 'unknown' for each server without executing anything. Pass probe=true to actually probe each server (WARNING: executes commands and makes HTTP requests from MCP config files).",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"probe":{"type":"boolean","description":"Actually probe each server by executing its command or making an HTTP request. Default: false."}}}`),
+		Handler: func(_ context.Context, in json.RawMessage) (any, error) {
+			args := struct {
+				Probe bool `json:"probe"`
+			}{}
+			_ = json.Unmarshal(in, &args)
 			servers, _ := mcpcfg.Discover(mcpcfg.DefaultSources())
+			if !args.Probe {
+				results := make([]model.MCPHealthResult, len(servers))
+				for i, s := range servers {
+					results[i] = model.MCPHealthResult{Name: s.Name, Client: s.Client, Status: "unknown"}
+				}
+				return results, nil
+			}
 			return mcphealth.ProbeAll(servers), nil
 		},
 	})
