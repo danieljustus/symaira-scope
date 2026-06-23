@@ -5,6 +5,19 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-06-22
+
+### Fixed
+- Config permissions and `ports suggest` flag wiring (correctly reads config defaults)
+- `mcp add` validation now requires at least `--command` or `--url`
+- `mcp_health` tool is opt-in by default (returns "unknown" unless `probe=true`)
+- Cache stats command deprecated in favor of `cache show`
+
+### Changed
+- Container discovery uses local Docker CLI instead of Docker SDK
+- Scan collects ports, MCP servers, and containers concurrently
+- Free port suggestion uses atomic allocation for better parallel performance
+
 ## [0.1.0] — 2026-06-18
 
 First public release. Go CLI + MCP server that inventories local listening ports,
