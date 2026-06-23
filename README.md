@@ -10,7 +10,7 @@ or "give me three free ports" itself.
 
 Part of the [Symaira](../ECOSYSTEM.md) family (Go core, MIT, corekit-based).
 
-> **Status: v0.1.0** — first public release. Ports, MCP-discovery, Docker containers,
+> **Status: v0.1.1** — first public release. Ports, MCP-discovery, Docker containers,
 > conflicts, caching, health probes, and more all work. Cross-platform (macOS,
 > Linux, Windows). This is the Go successor to the earlier Rust `OpenScope` prototype.
 

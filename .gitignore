@@ -18,5 +18,7 @@ coverage.*
 .sisyphus/
 .github/audit/
 .github/review/
+.github/coverage/
+.github/prerelease/
 .omo/
 .worktrees/
