@@ -11,6 +11,14 @@ import (
 	"github.com/danieljustus/symaira-scope/internal/ports"
 )
 
+// Package-level function variables for dependency injection. Tests override
+// these to avoid OS/Docker dependencies.
+var (
+	listListeningFn = ports.ListListening
+	discoverFn      = mcpcfg.Discover
+	containersFn    = containers.List
+)
+
 // Build produces a full inventory snapshot. The port, MCP-config, and
 // container collectors run concurrently so that a slow or unreachable Docker
 // daemon does not block the entire scan.
@@ -31,7 +39,7 @@ func Build() (model.Snapshot, error) {
 
 	go func() {
 		defer wg.Done()
-		p, err := ports.ListListening()
+		p, err := listListeningFn()
 		mu.Lock()
 		defer mu.Unlock()
 		portsResult = p
@@ -40,7 +48,7 @@ func Build() (model.Snapshot, error) {
 
 	go func() {
 		defer wg.Done()
-		s, n := mcpcfg.Discover(mcpcfg.DefaultSources())
+		s, n := discoverFn(mcpcfg.DefaultSources())
 		mu.Lock()
 		defer mu.Unlock()
 		serversResult = s
@@ -49,7 +57,7 @@ func Build() (model.Snapshot, error) {
 
 	go func() {
 		defer wg.Done()
-		c, n := containers.List()
+		c, n := containersFn()
 		mu.Lock()
 		defer mu.Unlock()
 		contResult = c
