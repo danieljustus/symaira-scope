@@ -3,6 +3,7 @@ package mcpcfg
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -120,6 +121,11 @@ func TestAddServerPreservesPermissions(t *testing.T) {
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Windows does not round-trip Unix permission bits through os.Chmod,
+	// so the exact mode assertion is meaningful only on Unix-like systems.
+	if runtime.GOOS == "windows" {
+		return
 	}
 	if info.Mode().Perm() != 0o644 {
 		t.Errorf("permissions: want 0o644, got %o", info.Mode().Perm())
