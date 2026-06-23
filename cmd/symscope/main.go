@@ -27,7 +27,7 @@ import (
 	"github.com/danieljustus/symaira-scope/internal/scan"
 )
 
-var version = "0.1.0-dev"
+var version = "0.1.1"
 
 func main() {
 	slog.SetDefault(logkit.NewFromEnv("symscope"))
