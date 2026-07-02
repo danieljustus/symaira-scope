@@ -53,3 +53,16 @@ release:
     name: symaira-scope
   draft: false
   prerelease: auto
+
+brews:
+  - name: symscope
+    repository:
+      owner: danieljustus
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/danieljustus/symaira-scope
+    description: Cross-platform port inventory and MCP discovery tool for AI agents
+    license: MIT
+    test: |
+      system "#{bin}/symscope", "version"
