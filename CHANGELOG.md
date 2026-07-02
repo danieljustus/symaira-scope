@@ -5,6 +5,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-07-02
+
+### Added
+- Homebrew formula generation in GoReleaser config
+
+### Changed
+- Bump symaira-corekit to v0.2.1
+
+### Infrastructure
+- Sign and notarize macOS binaries with Developer ID
+- Use canonical Apache-2.0 license text
+
 ## [0.1.1] — 2026-06-22
 
 ### Fixed

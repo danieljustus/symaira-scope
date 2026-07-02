@@ -10,9 +10,10 @@ or "give me three free ports" itself.
 
 Part of the [Symaira](../ECOSYSTEM.md) family (Go core, MIT, corekit-based).
 
-> **Status: v0.1.1** — first public release. Ports, MCP-discovery, Docker containers,
-> conflicts, caching, health probes, and more all work. Cross-platform (macOS,
-> Linux, Windows). This is the Go successor to the earlier Rust `OpenScope` prototype.
+> **Status: v0.1.2** — patch release. Adds Homebrew formula generation, signed and
+> notarized macOS binaries, and bumps symaira-corekit. Ports, MCP-discovery, Docker
+> containers, conflicts, caching, health probes, and more all work. Cross-platform
+> (macOS, Linux, Windows).
 
 ## Install (from source)
 
