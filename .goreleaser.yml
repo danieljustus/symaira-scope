@@ -21,7 +21,11 @@ builds:
       - -s -w -X main.version={{.Version}}
     hooks:
       post:
-        - cmd: sh -c 'if [ "{{ .Os }}" = "darwin" ] && [ -n "${CODESIGN_IDENTITY:-}" ]; then codesign -s "$CODESIGN_IDENTITY" --timestamp --options runtime "{{ .Path }}"; echo "Signed {{ .Path }}"; fi'
+        - cmd: |
+            if [ "{{ .Os }}" = "darwin" ] && [ -n "${CODESIGN_IDENTITY:-}" ]; then
+              codesign -s "$CODESIGN_IDENTITY" --timestamp --options runtime "{{ .Path }}"
+              echo "Signed {{ .Path }}"
+            fi
 
 archives:
   - id: default
