@@ -1,14 +1,16 @@
 import Foundation
+import SymairaCLIRunner
+import SymairaToolKit
 
 public enum CLIError: Error, LocalizedError, Sendable {
     case binaryNotFound
     case executionFailed(code: Int, message: String)
     case invalidJSON(Error)
-    
+
     public var errorDescription: String? {
         switch self {
         case .binaryNotFound:
-            return "The symscope binary could not be found in the app bundle resources or build paths."
+            return "The symscope binary could not be found in the app bundle, PATH, or Homebrew paths. Install it via 'brew install danieljustus/tap/symscope'."
         case .executionFailed(let code, let message):
             return "CLI execution failed with exit code \(code): \(message)"
         case .invalidJSON(let err):
@@ -19,80 +21,40 @@ public enum CLIError: Error, LocalizedError, Sendable {
 
 public final class CLIClient: Sendable {
     private let decoder: JSONDecoder
+    private let runner = CLIRunner(defaultTimeout: 60)
+    private let locator: BinaryLocator
 
     public init() {
         decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-    }
 
-    private func locateBinary() -> URL? {
-        // 1. Look in the main App bundle's resources
-        if let bundleURL = Bundle.main.url(forResource: "symscope", withExtension: nil) {
-            return bundleURL
-        }
-        
-        // 2. Look in the same directory as the executable (useful during local runs/tests)
-        let bundleDir = Bundle.main.bundleURL.deletingLastPathComponent()
-        let devBinary = bundleDir.appendingPathComponent("symscope")
-        if FileManager.default.fileExists(atPath: devBinary.path) {
-            return devBinary
-        }
-        
-        // 3. Look in project root folder (fallback for CLI test environments)
+        // Repo root (../symscope) as last resort keeps the pre-AppKit dev
+        // workflow working when running tests without a bundled binary.
         let projectRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let projectBinary = projectRoot.appendingPathComponent("symscope")
-        if FileManager.default.fileExists(atPath: projectBinary.path) {
-            return projectBinary
-        }
-        
-        return nil
+            .deletingLastPathComponent() // SymscopeKit/
+            .deletingLastPathComponent() // Sources/
+            .deletingLastPathComponent() // client/
+            .deletingLastPathComponent() // repo root
+        locator = BinaryLocator(extraDirectories: ["/opt/homebrew/bin", "/usr/local/bin", projectRoot.path])
     }
 
     public func runCommand(args: [String]) async throws -> Data {
-        guard let binaryURL = locateBinary() else {
+        guard let located = locator.locate("symscope") else {
             throw CLIError.binaryNotFound
         }
-        
-        let process = Process()
-        process.executableURL = binaryURL
-        process.arguments = args
-        
-        let pipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = errorPipe
-        
-        // Inherit path environment so standard commands like docker are available
-        var env = ProcessInfo.processInfo.environment
-        if let path = env["PATH"] {
-            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:\(path)"
-        } else {
-            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+
+        do {
+            return try await runner.runChecked(located.url, arguments: args)
+        } catch let CLIRunnerError.executionFailed(code, stderr) {
+            throw CLIError.executionFailed(code: Int(code), message: stderr)
         }
-        process.environment = env
-        
-        return try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { proc in
-                let exitStatus = proc.terminationStatus
-                if exitStatus != 0 {
-                    let errData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                    let errMsg = String(data: errData, encoding: .utf8)?
-                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown error"
-                    continuation.resume(throwing: CLIError.executionFailed(code: Int(exitStatus), message: errMsg))
-                } else {
-                    let outData = pipe.fileHandleForReading.readDataToEndOfFile()
-                    continuation.resume(returning: outData)
-                }
-            }
-            
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: error)
-            }
+    }
+
+    private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            throw CLIError.invalidJSON(error)
         }
     }
 
@@ -101,12 +63,7 @@ public final class CLIClient: Sendable {
         if noCache {
             args.append("--no-cache")
         }
-        let data = try await runCommand(args: args)
-        do {
-            return try decoder.decode(Snapshot.self, from: data)
-        } catch {
-            throw CLIError.invalidJSON(error)
-        }
+        return try decode(Snapshot.self, from: try await runCommand(args: args))
     }
 
     public func suggestPorts(count: Int, from: Int? = nil, to: Int? = nil) async throws -> [Int] {
@@ -117,31 +74,16 @@ public final class CLIClient: Sendable {
         if let to = to {
             args.append(contentsOf: ["--to", "\(to)"])
         }
-        let data = try await runCommand(args: args)
-        do {
-            let res = try decoder.decode(SuggestionResponse.self, from: data)
-            return res.free
-        } catch {
-            throw CLIError.invalidJSON(error)
-        }
+        let res = try decode(SuggestionResponse.self, from: try await runCommand(args: args))
+        return res.free
     }
 
     public func listConflicts() async throws -> [Conflict] {
-        let data = try await runCommand(args: ["conflicts"])
-        do {
-            return try decoder.decode([Conflict].self, from: data)
-        } catch {
-            throw CLIError.invalidJSON(error)
-        }
+        try decode([Conflict].self, from: try await runCommand(args: ["conflicts"]))
     }
 
     public func listClientConfigs() async throws -> [ClientConfig] {
-        let data = try await runCommand(args: ["clients", "list"])
-        do {
-            return try decoder.decode([ClientConfig].self, from: data)
-        } catch {
-            throw CLIError.invalidJSON(error)
-        }
+        try decode([ClientConfig].self, from: try await runCommand(args: ["clients", "list"]))
     }
 
     public func getVersion() async throws -> String {

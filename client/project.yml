@@ -16,6 +16,9 @@ settings:
 packages:
   SymscopeClient:
     path: .
+  SymairaAppKit:
+    url: https://github.com/danieljustus/symaira-appkit
+    exactVersion: 0.1.0
 
 targets:
   Symscope:
@@ -38,6 +41,8 @@ targets:
     dependencies:
       - package: SymscopeClient
         product: SymscopeKit
+      - package: SymairaAppKit
+        product: SymairaTheme
     postBuildScripts:
       - name: Embed symscope Engine
         script: |

@@ -47,3 +47,18 @@ internal/config/        configkit loader
 - Release: GoReleaser → `../homebrew-tap` (mirror symfetch/symseek).
 
 See `docs/roadmap.md` for built-vs-planned and `docs/architecture.md` for design.
+
+## macOS Client (`client/`)
+
+- SwiftUI app: local SPM package `SymscopeClient` (SymscopeKit) + XcodeGen app
+  target (`cd client && xcodegen generate`, scheme `Symscope`). Local builds
+  need `DEVELOPER_DIR` pointing at Xcode (CommandLineTools lack XCTest).
+- Depends on the shared **symaira-appkit** package, pinned exact (`0.1.0`) in
+  BOTH `client/Package.swift` (SymscopeKit → SymairaCLIRunner, SymairaToolKit)
+  and `client/project.yml` (app → SymairaTheme). Keep the two pins in sync.
+- `Views/Styles.swift` sources shared brand tokens from SymairaTheme; the
+  scope-specific values (bgCard/borderGlass variants, glows) and modifiers
+  stay local on purpose for pixel-identical rendering.
+- Do not reintroduce app-local Process/Theme plumbing; extend symaira-appkit
+  instead. Migration context: see `../docs/symaira-appkit-migration.md`
+  (Welle 1).
