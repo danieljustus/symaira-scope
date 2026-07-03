@@ -22,3 +22,9 @@ coverage.*
 .github/prerelease/
 .omo/
 .worktrees/
+
+# Xcode / Swift Client
+*.xcodeproj
+*.xcworkspace
+/client/build/
+/client/.build/
