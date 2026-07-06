@@ -1,0 +1,82 @@
+name: Symscope
+options:
+  bundleIdPrefix: dev.symaira
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: false
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.2"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  SymscopeClient:
+    path: .
+  SymairaAppKit:
+    url: https://github.com/danieljustus/symaira-appkit
+    exactVersion: 0.1.0
+
+targets:
+  Symscope:
+    type: application
+    platform: macOS
+    deploymentTarget:
+      macOS: "14.0"
+    sources:
+      - path: Sources/SymscopeApp
+    entitlements:
+      path: Symscope.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.symaira.Symscope
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_HARDENED_RUNTIME: true
+        COMBINE_HIDPI_IMAGES: true
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - package: SymscopeClient
+        product: SymscopeKit
+      - package: SymairaAppKit
+        product: SymairaTheme
+    postBuildScripts:
+      - name: Embed symscope Engine
+        script: |
+          # Build the Go binary in the root directory first
+          cd "${PROJECT_DIR}/.."
+          CGO_ENABLED=0 go build -o symscope ./cmd/symscope
+          
+          SRC="${PROJECT_DIR}/../symscope"
+          DST="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources"
+          if [ -f "$SRC" ]; then
+            mkdir -p "$DST"
+            cp "$SRC" "$DST/symscope"
+            chmod +x "$DST/symscope"
+            echo "Embedded symscope binary into $DST/symscope"
+          else
+            echo "error: symscope binary not found at $SRC"
+            exit 1
+          fi
+        runOnlyWhenInstalling: false
+        basedOnDependencyAnalysis: false
+
+  SymscopeTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget:
+      macOS: "14.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Symscope
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.symaira.Symscope.tests
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Symscope.app/Contents/MacOS/Symscope"
+        GENERATE_INFOPLIST_FILE: YES

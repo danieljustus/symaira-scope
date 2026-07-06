@@ -83,6 +83,116 @@ jobs:
             done
           done
 
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: |
+          cd client
+          xcodegen generate
+
+      - name: Build and archive Swift App (signed)
+        if: steps.signing.outputs.signed == 'true'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          xcodebuild archive \
+            -project client/Symscope.xcodeproj \
+            -scheme Symscope \
+            -archivePath client/build/release/Symscope.xcarchive \
+            -configuration Release \
+            MARKETING_VERSION="${VERSION}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_ALLOWED=YES
+
+      - name: Export Swift App (signed)
+        if: steps.signing.outputs.signed == 'true'
+        run: |
+          cat > client/build/release/ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>developer-id</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>signingCertificate</key>
+              <string>Developer ID Application</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath client/build/release/Symscope.xcarchive \
+            -exportOptionsPlist client/build/release/ExportOptions.plist \
+            -exportPath client/build/release/export
+
+      - name: Build Swift App (unsigned)
+        if: steps.signing.outputs.signed == 'false'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          xcodebuild build \
+            -project client/Symscope.xcodeproj \
+            -scheme Symscope \
+            -configuration Release \
+            -derivedDataPath client/build/release/DerivedData \
+            MARKETING_VERSION="${VERSION}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+          APP_PATH=$(find client/build/release/DerivedData -name "Symscope.app" -type d | head -1)
+          mkdir -p client/build/release/export
+          cp -R "$APP_PATH" client/build/release/export/
+
+      - name: Notarize and staple Swift App
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
+          NOTARY_API_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+        run: |
+          APP_PATH=$(find client/build/release/export -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::No .app found for notarization."
+            exit 1
+          fi
+          if [ -z "${NOTARY_API_KEY:-}" ]; then
+            echo "::warning::NOTARY_API_KEY secret is not set. Skipping notarization."
+            exit 0
+          fi
+          xcrun notarytool submit "$APP_PATH" \
+            --apple-id "${NOTARY_API_KEY_ID}" \
+            --team-id "${NOTARY_API_ISSUER}" \
+            --password "${NOTARY_API_KEY}" \
+            --wait
+          xcrun stapler staple "$APP_PATH"
+
+      - name: Create DMG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          APP_PATH=$(find client/build/release/export -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::No .app found for DMG creation."
+            exit 1
+          fi
+          hdiutil create -volname "Symscope" \
+            -srcfolder "$APP_PATH" \
+            -ov -format UDZO \
+            "client/build/release/Symscope-${VERSION}.dmg"
+
+      - name: Upload DMG to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DMG_PATH="client/build/release/Symscope-${VERSION}.dmg"
+          gh release upload "v${VERSION}" \
+            "${DMG_PATH}#Symscope-${VERSION}.dmg" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
       - name: Clean up signing material
         if: always()
         run: |
