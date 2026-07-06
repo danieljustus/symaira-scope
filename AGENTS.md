@@ -62,3 +62,13 @@ See `docs/roadmap.md` for built-vs-planned and `docs/architecture.md` for design
 - Do not reintroduce app-local Process/Theme plumbing; extend symaira-appkit
   instead. Migration context: see `../docs/symaira-appkit-migration.md`
   (Welle 1).
+
+### Feature module (`SymscopeFeature`)
+
+- `client/Package.swift` exposes **SymscopeFeature** (views + AppState, no
+  app entry) with the public root view `SymscopeModuleView` — consumed by
+  the thin standalone app AND embedded in **symaira-hub** per its Module
+  Integration Contract. `SymscopeModule.expectedSchemaVersion` declares the
+  CLI JSON contract (0 until symscope ships `version --json`).
+- Keep new views internal to SymscopeFeature; only the module root is
+  public. Breaking view/state changes are hub-visible — build the hub too.
