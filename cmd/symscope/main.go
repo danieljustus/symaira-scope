@@ -14,6 +14,7 @@ import (
 	"github.com/danieljustus/symaira-corekit/exitcodes"
 	"github.com/danieljustus/symaira-corekit/logkit"
 	"github.com/danieljustus/symaira-corekit/updatecheck"
+	"github.com/danieljustus/symaira-corekit/versionkit"
 
 	"github.com/danieljustus/symaira-scope/internal/cache"
 	"github.com/danieljustus/symaira-scope/internal/config"
@@ -380,11 +381,16 @@ func newServeCmd() *cobra.Command {
 
 func newVersionCmd() *cobra.Command {
 	var check bool
+	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			fmt.Println("symscope", version)
+			info := versionkit.New("symscope", version, 1)
+			if jsonOut {
+				return info.Write(os.Stdout)
+			}
+			fmt.Println(info.String())
 			if !check {
 				return nil
 			}
@@ -402,5 +408,6 @@ func newVersionCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "Check for updates on GitHub")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit machine-readable JSON")
 	return cmd
 }
