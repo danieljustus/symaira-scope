@@ -28,3 +28,8 @@ coverage.*
 *.xcworkspace
 /client/build/
 /client/.build/
+
+# Local agent reports / session state
+.omo/run-continuation/
+.omo/notepads/
+coverage.html
