@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/danieljustus/symaira-scope/internal/model"
 	"github.com/danieljustus/symaira-scope/internal/ports"
 	"github.com/danieljustus/symaira-scope/internal/scan"
+	"github.com/danieljustus/symaira-scope/internal/watch"
 )
 
 var version = "0.1.2"
@@ -67,6 +69,7 @@ an MCP server for agents.`,
 		newCacheCmd(),
 		newServeCmd(),
 		newVersionCmd(),
+		newWatchCmd(),
 	)
 	return root
 }
@@ -409,5 +412,53 @@ func newVersionCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "Check for updates on GitHub")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit machine-readable JSON")
+	return cmd
+}
+
+func newWatchCmd() *cobra.Command {
+	var interval time.Duration
+	var format string
+	cmd := &cobra.Command{
+		Use:   "watch",
+		Short: "Watch for changes in ports, conflicts, and MCP configs",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if format != "ndjson" {
+				return exitcodes.Wrap(fmt.Errorf("unsupported format %q (only ndjson is supported)", format), exitcodes.ExitConfig, exitcodes.KindValidation, "watch")
+			}
+			if interval <= 0 {
+				return exitcodes.Wrap(fmt.Errorf("interval must be greater than 0"), exitcodes.ExitConfig, exitcodes.KindValidation, "watch")
+			}
+
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetEscapeHTML(false)
+
+			oldSnap, err := scan.Build()
+			if err != nil {
+				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "watch initial scan")
+			}
+
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+
+			for range ticker.C {
+				newSnap, err := scan.Build()
+				if err != nil {
+					slog.Warn("scan failed", "err", err)
+					continue
+				}
+
+				events := watch.Diff(oldSnap, newSnap)
+				for _, e := range events {
+					if err := enc.Encode(e); err != nil {
+						slog.Warn("failed to encode event", "err", err)
+					}
+				}
+				oldSnap = newSnap
+			}
+			return nil
+		},
+	}
+	cmd.Flags().DurationVar(&interval, "interval", 2*time.Second, "Polling interval (e.g. 1s, 500ms)")
+	cmd.Flags().StringVar(&format, "format", "ndjson", "Output format (ndjson)")
 	return cmd
 }
