@@ -44,15 +44,22 @@ func DefaultSources() []Source {
 		{"roo-code", filepath.Join(home, ".vscode/extensions/*roo*/settings/roo_mcp_settings.json"), "mcpServers"},
 		{"zed", filepath.Join(home, ".config/zed/mcp.json"), "mcpServers"},
 		{"vscode-workspace", filepath.Join(cwd, ".vscode/mcp.json"), "servers"},
+		{"kiro", filepath.Join(home, ".kiro/settings/mcp.json"), "mcpServers"},
+		{"qoder", filepath.Join(home, ".qoder/settings.json"), "mcpServers"},
+		{"copilot-cli", filepath.Join(home, ".copilot/mcp-config.json"), "mcpServers"},
+		{"lmstudio", filepath.Join(home, ".lmstudio/mcp.json"), "mcpServers"},
+		{"antigravity", filepath.Join(home, ".gemini/config/mcp_config.json"), "mcpServers"},
+		{"gemini-cli", filepath.Join(home, ".gemini/settings.json"), "mcpServers"},
 	}
 }
 
 type Entry struct {
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
-	URL     string            `json:"url"`
-	Type    string            `json:"type"`
-	Env     map[string]string `json:"env"`
+	Command   string            `json:"command"`
+	Args      []string          `json:"args"`
+	URL       string            `json:"url"`
+	ServerURL string            `json:"serverUrl"`
+	Type      string            `json:"type"`
+	Env       map[string]string `json:"env"`
 }
 
 // parseConfig reads a config file and returns the server map under the given key.
@@ -146,8 +153,12 @@ func Discover(sources []Source) ([]model.MCPServer, []string) {
 				continue
 			}
 			seen[dedupKey] = true
+			url := e.URL
+			if url == "" {
+				url = e.ServerURL
+			}
 			transport := "stdio"
-			if e.URL != "" {
+			if url != "" {
 				transport = "http"
 			}
 			if e.Type != "" {
@@ -161,14 +172,14 @@ func Discover(sources []Source) ([]model.MCPServer, []string) {
 				}
 			}
 			out = append(out, model.MCPServer{
-				Name:        name,
-				Client:      s.Client,
-				Transport:   transport,
-				Command:     e.Command,
-				Args:        e.Args,
-				URL:         e.URL,
-				ConfigPath:  s.Path,
-				Env:         e.Env,
+				Name:         name,
+				Client:       s.Client,
+				Transport:    transport,
+				Command:      e.Command,
+				Args:         e.Args,
+				URL:          url,
+				ConfigPath:   s.Path,
+				Env:          e.Env,
 				SecretBacked: secretBacked,
 			})
 		}

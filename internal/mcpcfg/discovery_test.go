@@ -280,6 +280,111 @@ func TestDiscoverZed(t *testing.T) {
 	}
 }
 
+func TestDiscoverKiro(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.json")
+	data := `{"mcpServers":{"kiro-server":{"command":"kiro-mcp"}}}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := Discover([]Source{{Client: "kiro", Path: path, Key: "mcpServers"}})
+	if len(got) != 1 {
+		t.Fatalf("want 1 server, got %d", len(got))
+	}
+	if got[0].Name != "kiro-server" {
+		t.Errorf("name: want %q, got %q", "kiro-server", got[0].Name)
+	}
+	if got[0].Client != "kiro" {
+		t.Errorf("client: want %q, got %q", "kiro", got[0].Client)
+	}
+}
+
+func TestDiscoverQoder(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	data := `{"mcpServers":{"qoder-server":{"command":"qoder-mcp"}}}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := Discover([]Source{{Client: "qoder", Path: path, Key: "mcpServers"}})
+	if len(got) != 1 {
+		t.Fatalf("want 1 server, got %d", len(got))
+	}
+	if got[0].Name != "qoder-server" {
+		t.Errorf("name: want %q, got %q", "qoder-server", got[0].Name)
+	}
+}
+
+func TestDiscoverCopilotCLI(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp-config.json")
+	data := `{"mcpServers":{"copilot-server":{"command":"copilot-mcp","type":"local"}}}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := Discover([]Source{{Client: "copilot-cli", Path: path, Key: "mcpServers"}})
+	if len(got) != 1 {
+		t.Fatalf("want 1 server, got %d", len(got))
+	}
+	if got[0].Transport != "local" {
+		t.Errorf("transport: want %q, got %q", "local", got[0].Transport)
+	}
+}
+
+func TestDiscoverLMStudio(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.json")
+	data := `{"mcpServers":{"lmstudio-server":{"command":"lmstudio-mcp"}}}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := Discover([]Source{{Client: "lmstudio", Path: path, Key: "mcpServers"}})
+	if len(got) != 1 {
+		t.Fatalf("want 1 server, got %d", len(got))
+	}
+	if got[0].Name != "lmstudio-server" {
+		t.Errorf("name: want %q, got %q", "lmstudio-server", got[0].Name)
+	}
+}
+
+func TestDiscoverAntigravity(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp_config.json")
+	data := `{"mcpServers":{"antigravity-server":{"command":"antigravity-mcp","serverUrl":"http://localhost:4000"}}}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := Discover([]Source{{Client: "antigravity", Path: path, Key: "mcpServers"}})
+	if len(got) != 1 {
+		t.Fatalf("want 1 server, got %d", len(got))
+	}
+	if got[0].URL != "http://localhost:4000" {
+		t.Errorf("url: want %q, got %q", "http://localhost:4000", got[0].URL)
+	}
+}
+
+func TestDiscoverGeminiCLI(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	data := `{"mcpServers":{"gemini-server":{"command":"gemini-mcp"}}}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := Discover([]Source{{Client: "gemini-cli", Path: path, Key: "mcpServers"}})
+	if len(got) != 1 {
+		t.Fatalf("want 1 server, got %d", len(got))
+	}
+	if got[0].Name != "gemini-server" {
+		t.Errorf("name: want %q, got %q", "gemini-server", got[0].Name)
+	}
+}
+
 func TestExpandGlobNoWildcard(t *testing.T) {
 	s := Source{Client: "test", Path: "/some/fixed/path.json", Key: "k"}
 	got := expandGlob(s)
