@@ -36,8 +36,10 @@ internal/config/        configkit loader
   the published version (currently `v0.1.1`).
 - **Zero stdout pollution in `serve`**: stdout carries only JSON-RPC frames; all
   logs go to stderr via slog (`logkit`).
-- **Read-only & local**: discovery never mutates client configs and makes no
-  network calls (except the explicit `version --check`).
+- **Read-only & local for discovery**: discovery/read paths never mutate client
+  configs and make no network calls (except the explicit `version --check`).
+  Intentional mutation is limited to the explicit `mcp add` / `mcp rm` commands,
+  which write atomically, preserve existing file permissions, and validate input.
 - **JSON is snake_case**; keep Go fields idiomatic with `json:"..."` tags.
 
 ## Conventions (ecosystem)
@@ -46,7 +48,8 @@ internal/config/        configkit loader
 - Exit codes via `corekit/exitcodes` (wrap errors with `exitcodes.Wrap`).
 - Release: GoReleaser → `../homebrew-tap` (mirror symfetch/symseek).
 
-See `docs/roadmap.md` for built-vs-planned and `docs/architecture.md` for design.
+Planning and design docs are maintained in GitHub Issues and Milestones; the
+local `docs/` directory is no longer tracked in git.
 
 ## macOS Client (`client/`)
 
