@@ -72,6 +72,10 @@ func Build() (model.Snapshot, error) {
 
 	allNotes = append(serversNotes, contNotes...)
 
+	for i := range serversResult {
+		serversResult[i].CredentialWarnings = mcpcfg.CheckCredentials(serversResult[i])
+	}
+
 	return model.Snapshot{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 		Ports:       portsResult,
