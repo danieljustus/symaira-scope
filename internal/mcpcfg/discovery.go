@@ -112,6 +112,158 @@ func parseYAMLConfig(data []byte, key string) (map[string]Entry, error) {
 	return servers, nil
 }
 
+var candidateKeys = []string{"mcpServers", "servers", "mcp_servers", "context_servers", "mcp.servers", "mcp"}
+
+func parseConfigAutoDetect(path string) (map[string]Entry, string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, "", err
+	}
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".yaml" || ext == ".yml" {
+		return parseYAMLConfigAutoDetect(data, candidateKeys)
+	}
+	return parseJSONConfigAutoDetect(data, candidateKeys)
+}
+
+func parseJSONConfigAutoDetect(data []byte, candidates []string) (map[string]Entry, string, error) {
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, "", fmt.Errorf("parse json: %w", err)
+	}
+	for _, key := range candidates {
+		raw, err := lookupJSONKey(doc, key)
+		if err != nil {
+			continue
+		}
+		var servers map[string]Entry
+		if err := json.Unmarshal(raw, &servers); err == nil {
+			return servers, key, nil
+		}
+	}
+	return nil, "", fmt.Errorf("no known server key found")
+}
+
+func lookupJSONKey(doc map[string]json.RawMessage, key string) (json.RawMessage, error) {
+	parts := strings.Split(key, ".")
+	current := doc
+	for i, part := range parts {
+		raw, ok := current[part]
+		if !ok {
+			return nil, fmt.Errorf("key %q not found", key)
+		}
+		if i == len(parts)-1 {
+			return raw, nil
+		}
+		var next map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &next); err != nil {
+			return nil, err
+		}
+		current = next
+	}
+	return nil, fmt.Errorf("key %q not found", key)
+}
+
+func parseYAMLConfigAutoDetect(data []byte, candidates []string) (map[string]Entry, string, error) {
+	var doc map[string]any
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, "", fmt.Errorf("parse yaml: %w", err)
+	}
+	for _, key := range candidates {
+		raw, err := lookupYAMLKey(doc, key)
+		if err != nil {
+			continue
+		}
+		jsonBytes, err := json.Marshal(raw)
+		if err != nil {
+			continue
+		}
+		var servers map[string]Entry
+		if err := json.Unmarshal(jsonBytes, &servers); err == nil {
+			return servers, key, nil
+		}
+	}
+	return nil, "", fmt.Errorf("no known server key found")
+}
+
+func lookupYAMLKey(doc map[string]any, key string) (any, error) {
+	parts := strings.Split(key, ".")
+	current := doc
+	for i, part := range parts {
+		v, ok := current[part]
+		if !ok {
+			return nil, fmt.Errorf("key %q not found", key)
+		}
+		if i == len(parts)-1 {
+			return v, nil
+		}
+		next, ok := v.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("key %q is not a map", key)
+		}
+		current = next
+	}
+	return nil, fmt.Errorf("key %q not found", key)
+}
+
+// DiscoverFiles parses explicit config files and returns the servers found under
+// any known key. Errors for individual files are returned as notes.
+func DiscoverFiles(paths []string) ([]model.MCPServer, []string) {
+	var out []model.MCPServer
+	var notes []string
+	seen := map[string]bool{}
+	for _, p := range paths {
+		servers, _, err := parseConfigAutoDetect(p)
+		if err != nil {
+			notes = append(notes, fmt.Sprintf("config parse error for %s: %v", p, err))
+			continue
+		}
+		for name, e := range servers {
+			dedupKey := p + ":" + name
+			if seen[dedupKey] {
+				continue
+			}
+			seen[dedupKey] = true
+			url := e.URL
+			if url == "" {
+				url = e.ServerURL
+			}
+			transport := "stdio"
+			if url != "" {
+				transport = "http"
+			}
+			if e.Type != "" {
+				transport = e.Type
+			}
+			secretBacked := false
+			for _, v := range e.Env {
+				if strings.HasPrefix(v, "vault://") {
+					secretBacked = true
+					break
+				}
+			}
+			out = append(out, model.MCPServer{
+				Name:         name,
+				Client:       "file",
+				Transport:    transport,
+				Command:      e.Command,
+				Args:         e.Args,
+				URL:          url,
+				ConfigPath:   p,
+				Env:          e.Env,
+				SecretBacked: secretBacked,
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Name != out[j].Name {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].ConfigPath < out[j].ConfigPath
+	})
+	return out, notes
+}
+
 // expandGlob returns one Source per glob match, or the original source when
 // the path contains no wildcard characters.
 func expandGlob(s Source) []Source {

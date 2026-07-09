@@ -385,6 +385,110 @@ func TestDiscoverGeminiCLI(t *testing.T) {
 	}
 }
 
+func TestDiscoverFilesAutoDetectsKnownKeys(t *testing.T) {
+	cases := []struct {
+		name string
+		data string
+	}{
+		{"mcpServers", `{"mcpServers":{"s":{"command":"c"}}}`},
+		{"servers", `{"servers":{"s":{"command":"c"}}}`},
+		{"mcp_servers", `{"mcp_servers":{"s":{"command":"c"}}}`},
+		{"context_servers", `{"context_servers":{"s":{"command":"c"}}}`},
+		{"mcp", `{"mcp":{"s":{"command":"c"}}}`},
+		{"mcp.servers", `{"mcp":{"servers":{"s":{"command":"c"}}}}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "config.json")
+			if err := os.WriteFile(path, []byte(tc.data), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, _ := DiscoverFiles([]string{path})
+			if len(got) != 1 {
+				t.Fatalf("want 1 server for key %q, got %d", tc.name, len(got))
+			}
+			if got[0].Name != "s" {
+				t.Errorf("name: want %q, got %q", "s", got[0].Name)
+			}
+		})
+	}
+}
+
+func TestDiscoverFilesAutoDetectsYAMLKeys(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	data := `mcp:
+  servers:
+    s:
+      command: c
+`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := DiscoverFiles([]string{path})
+	if len(got) != 1 {
+		t.Fatalf("want 1 server, got %d", len(got))
+	}
+	if got[0].Command != "c" {
+		t.Errorf("command: want %q, got %q", "c", got[0].Command)
+	}
+}
+
+func TestDiscoverFilesMultiple(t *testing.T) {
+	dir := t.TempDir()
+	path1 := filepath.Join(dir, "a.json")
+	path2 := filepath.Join(dir, "b.yaml")
+	if err := os.WriteFile(path1, []byte(`{"mcpServers":{"a":{"command":"a"}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path2, []byte(`servers:
+  b:
+    command: b
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := DiscoverFiles([]string{path1, path2})
+	if len(got) != 2 {
+		t.Fatalf("want 2 servers, got %d", len(got))
+	}
+	names := map[string]bool{}
+	for _, s := range got {
+		names[s.Name] = true
+	}
+	if !names["a"] || !names["b"] {
+		t.Errorf("expected servers a and b, got %+v", names)
+	}
+}
+
+func TestDiscoverFilesDeduplicatesByPathAndName(t *testing.T) {
+	dir := t.TempDir()
+	path1 := filepath.Join(dir, "a.json")
+	path2 := filepath.Join(dir, "b.json")
+	if err := os.WriteFile(path1, []byte(`{"mcpServers":{"shared":{"command":"a"}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path2, []byte(`{"servers":{"shared":{"command":"b"}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := DiscoverFiles([]string{path1, path2})
+	if len(got) != 2 {
+		t.Fatalf("want 2 servers (same name, different paths), got %d", len(got))
+	}
+}
+
+func TestDiscoverFilesMissing(t *testing.T) {
+	got, notes := DiscoverFiles([]string{"/does/not/exist.json"})
+	if len(got) != 0 {
+		t.Fatalf("want 0 servers, got %d", len(got))
+	}
+	if len(notes) != 1 {
+		t.Fatalf("want 1 note, got %d", len(notes))
+	}
+}
+
 func TestExpandGlobNoWildcard(t *testing.T) {
 	s := Source{Client: "test", Path: "/some/fixed/path.json", Key: "k"}
 	got := expandGlob(s)
