@@ -150,11 +150,18 @@ func newPortsCmd() *cobra.Command {
 
 func newMCPCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "mcp", Short: "Inspect MCP servers configured in AI clients"}
-	cmd.AddCommand(&cobra.Command{
+
+	var checkCredentials bool
+	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List discovered MCP servers",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			servers, notes := mcpcfg.Discover(mcpcfg.DefaultSources())
+			if checkCredentials {
+				for i := range servers {
+					servers[i].CredentialWarnings = mcpcfg.CheckCredentials(servers[i])
+				}
+			}
 			if len(notes) > 0 {
 				for _, n := range notes {
 					slog.Warn(n)
@@ -162,7 +169,9 @@ func newMCPCmd() *cobra.Command {
 			}
 			return printJSON(servers)
 		},
-	})
+	}
+	listCmd.Flags().BoolVar(&checkCredentials, "check-credentials", false, "Flag env values that look like exposed credentials")
+	cmd.AddCommand(listCmd)
 
 	var addName, addCommand, addClient, addURL string
 	var addArgs []string

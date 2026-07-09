@@ -30,6 +30,7 @@ symscope scan              # full snapshot: ports + MCP servers + containers (JS
 symscope ports list        # listening TCP/UDP ports + owning process
 symscope ports suggest     # free TCP ports  (--count --from --to)
 symscope mcp list          # MCP servers discovered across AI clients
+symscope mcp list --check-credentials  # flag env values that look like exposed secrets
 symscope clients list      # which AI clients have an MCP config present
 symscope containers        # running containers with published ports
 symscope conflicts         # ports bound by more than one process
@@ -53,6 +54,11 @@ Register `symscope serve` with any MCP host:
 ```
 
 Tools: `scan`, `ports_list`, `ports_suggest`, `mcp_list`, `conflicts`.
+
+`scan` and `mcp list --check-credentials` include a `credential_warnings` field per
+server when an `env` value looks like an exposed API key or token (e.g. `sk-...`,
+`ghp_...`, JWTs, or long high-entropy strings). `vault://` references and obvious
+placeholders are ignored.
 
 ## Documentation
 
