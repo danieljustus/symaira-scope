@@ -152,11 +152,17 @@ func newMCPCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "mcp", Short: "Inspect MCP servers configured in AI clients"}
 
 	var checkCredentials bool
+	var files []string
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List discovered MCP servers",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			servers, notes := mcpcfg.Discover(mcpcfg.DefaultSources())
+			if len(files) > 0 {
+				fileServers, fileNotes := mcpcfg.DiscoverFiles(files)
+				servers = append(servers, fileServers...)
+				notes = append(notes, fileNotes...)
+			}
 			if checkCredentials {
 				for i := range servers {
 					servers[i].CredentialWarnings = mcpcfg.CheckCredentials(servers[i])
@@ -171,6 +177,7 @@ func newMCPCmd() *cobra.Command {
 		},
 	}
 	listCmd.Flags().BoolVar(&checkCredentials, "check-credentials", false, "Flag env values that look like exposed credentials")
+	listCmd.Flags().StringSliceVar(&files, "files", nil, "Additional config file(s) to parse; output is additive to default discovery")
 	cmd.AddCommand(listCmd)
 
 	var addName, addCommand, addClient, addURL string
