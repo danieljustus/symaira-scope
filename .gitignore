@@ -33,3 +33,6 @@ coverage.*
 .omo/run-continuation/
 .omo/notepads/
 coverage.html
+
+# Docs (roadmap/architecture superseded by GitHub Issues/Milestones as source of truth)
+/docs/
