@@ -10,10 +10,10 @@ or "give me three free ports" itself.
 
 Part of the [Symaira](../ECOSYSTEM.md) family (Go core, MIT, corekit-based).
 
-> **Status: v0.1.2** — patch release. Adds Homebrew formula generation, signed and
-> notarized macOS binaries, and bumps symaira-corekit. Ports, MCP-discovery, Docker
-> containers, conflicts, caching, health probes, and more all work. Cross-platform
-> (macOS, Linux, Windows).
+> **Status: v0.2.0** — adds a `watch` mode for ports, conflicts, and MCP configs,
+> detects likely-exposed credentials in MCP server env blocks, and discovers six
+> more AI clients. Ports, MCP-discovery, Docker containers, conflicts, caching,
+> health probes, and more all work. Cross-platform (macOS, Linux, Windows).
 
 ## Install (from source)
 
@@ -34,6 +34,7 @@ symscope mcp list --check-credentials  # flag env values that look like exposed 
 symscope clients list      # which AI clients have an MCP config present
 symscope containers        # running containers with published ports
 symscope conflicts         # ports bound by more than one process
+symscope watch             # stream ports/conflicts/MCP-config changes as NDJSON (--interval)
 symscope serve             # run the MCP stdio server for agents
 symscope version [--check]
 ```
