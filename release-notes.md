@@ -1,36 +1,31 @@
 ## What's changed
 
 ### Features
-- #15 Docker discovery, snapshot cache, more AI clients, conflicts, explain, MCP-hub, health probe, GoReleaser, CI matrix — closes #3, #4, #5, #6, #7, #8, #9, #10, #11, #12, #13, #14
+- #53 Add native macOS Swift GUI client (obsidian/gold styling)
+- #56 Expose `SymscopeFeature` module for embedding the client in symaira-hub
+- #60 Integrate `versionkit` and add `version --json`
+- #61 Bump hub `expectedSchemaVersion` to 1 (versionkit handshake)
+- #63 Add `watch` mode: stream ports/conflicts/MCP-config changes as NDJSON — closes #55
+- #68 Detect likely-exposed credentials in MCP server env blocks — closes #66
+- #69 Discover six more AI clients (Kiro, Qoder, Copilot CLI, LM Studio, Google Antigravity, Gemini CLI) and add a generic `--files` schema fallback — closes #64, #65
 
-### Fixes
-- #24 Fix config atomic writes, document health probe trust model, wire probe capability (+4 more) — closes #17, #18, #19, #20, #21, #22, #23
+### Docs
+- #70 Clarify that discovery stays read-only; `mcp add`/`mcp rm` is the intentional mutation surface — closes #67
+- #73 Document the `watch` command in the README and refresh the status line — closes #71, #72
 
-### Infrastructure
-- #1 Bump actions/setup-go from 5 to 6
-- #2 Bump actions/checkout from 4 to 6
-- CodeQL security analysis workflow
-- Dependabot for Go modules and GitHub Actions
+### Dependencies
+- #58 Bump `symaira-appkit` to v0.1.2 (client)
+- #62 Bump `symaira-appkit` to v0.2.0 (client)
+- #74 Bump `symaira-corekit` to v0.5.0 and `gopsutil` to v4.26.6
+- #75 Bump `actions/setup-go` to v7
 
 ### Closed Issues
-- #3 Docker container/port discovery
-- #4 Snapshot cache
-- #5 More AI clients
-- #6 Richer conflict detection
-- #7 Explain commands
-- #8 Table/JSON output modes
-- #9 MCP hub commands
-- #10 vault:// awareness
-- #11 MCP health probe
-- #12 GoReleaser config
-- #13 golangci-lint config
-- #14 Cross-platform CI matrix
-- #17 Config atomic writes
-- #18 Health probe sanitization
-- #19 MCP health probe --probe flag
-- #20 Config parsing errors
-- #21 Wire config loader
-- #22 Deduplicate port mapping
-- #23 Parallelize port scanning
+- #55 watch mode
+- #64 Discover MCP config for Kiro, Qoder, Copilot CLI, LM Studio, Google Antigravity, Gemini CLI
+- #65 Generic `--files` config schema fallback for unsupported/custom MCP clients
+- #66 Detect likely-exposed credentials in MCP server env blocks
+- #67 AGENTS.md and docs/architecture.md still claim symscope is strictly read-only
+- #71 Document the watch command in the README
+- #72 Refresh the README status line for the next release
 
-**Full Changelog**: First release — no previous tag
+**Full Changelog**: https://github.com/danieljustus/symaira-scope/compare/v0.1.2...v0.2.0

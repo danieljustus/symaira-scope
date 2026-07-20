@@ -5,6 +5,23 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-20
+
+### Added
+- Native macOS Swift GUI client (`client/`), styled in obsidian and gold, embeddable as a module in symaira-hub
+- `watch` mode: stream ports/conflicts/MCP-config changes as NDJSON (`--interval`)
+- Credential-leak detection for MCP server env blocks (`mcp list --check-credentials`, `scan` includes `credential_warnings`)
+- MCP config discovery for six more AI clients (Kiro, Qoder, Copilot CLI, LM Studio, Google Antigravity, Gemini CLI) plus a generic `--files` schema fallback
+- `versionkit` handshake integration and `version --json` flag
+
+### Changed
+- `AGENTS.md` clarified: discovery/read paths stay read-only and network-free; `mcp add`/`mcp rm` remain the intentional, atomic config-mutation surface
+- Bumped `symaira-corekit` to v0.5.0 and `gopsutil` to v4.26.6
+
+### Infrastructure
+- `docs/` is no longer tracked in git; planning docs live in GitHub Issues/Milestones
+- `actions/setup-go` bumped to v7
+
 ## [0.1.2] — 2026-07-02
 
 ### Added

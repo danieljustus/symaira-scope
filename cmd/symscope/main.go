@@ -30,7 +30,7 @@ import (
 	"github.com/danieljustus/symaira-scope/internal/watch"
 )
 
-var version = "0.1.2"
+var version = "0.2.0"
 
 func main() {
 	slog.SetDefault(logkit.NewFromEnv("symscope"))
