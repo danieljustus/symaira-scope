@@ -83,6 +83,16 @@ jobs:
             done
           done
 
+      - name: Configure git credentials for private SPM dependencies
+        env:
+          APPKIT_GITHUB_TOKEN: ${{ secrets.APPKIT_GITHUB_TOKEN }}
+        run: |
+          if [ -z "${APPKIT_GITHUB_TOKEN:-}" ]; then
+            echo "::error::APPKIT_GITHUB_TOKEN secret is not set. Swift Package resolution of the private symaira-appkit dependency will fail."
+            exit 1
+          fi
+          git config --global "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$APPKIT_GITHUB_TOKEN" | base64)"
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -199,3 +209,4 @@ jobs:
           if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
             security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
           fi
+          git config --global --unset-all "http.https://github.com/.extraheader" 2>/dev/null || true
