@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -25,6 +24,7 @@ import (
 	"github.com/danieljustus/symaira-scope/internal/mcpcfg"
 	"github.com/danieljustus/symaira-scope/internal/mcptools"
 	"github.com/danieljustus/symaira-scope/internal/model"
+	"github.com/danieljustus/symaira-scope/internal/output"
 	"github.com/danieljustus/symaira-scope/internal/ports"
 	"github.com/danieljustus/symaira-scope/internal/scan"
 	"github.com/danieljustus/symaira-scope/internal/watch"
@@ -38,13 +38,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, "symscope:", exitcodes.FormatCLIError(err))
 		os.Exit(int(exitcodes.ExitCodeFromError(err)))
 	}
-}
-
-func printJSON(v any) error {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	enc.SetEscapeHTML(false)
-	return enc.Encode(v)
 }
 
 func newRootCmd() *cobra.Command {
@@ -80,11 +73,12 @@ func newScanCmd() *cobra.Command {
 		Use:   "scan",
 		Short: "Full inventory snapshot (ports + MCP servers + containers)",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			out := output.New("json")
 			if !noCache {
 				if snap, err := cache.Load(); err != nil {
 					return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "cache load")
 				} else if snap != nil {
-					return printJSON(snap)
+					return out.Print(snap)
 				}
 			}
 
@@ -99,7 +93,7 @@ func newScanCmd() *cobra.Command {
 				}
 			}
 
-			return printJSON(snap)
+			return out.Print(snap)
 		},
 	}
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "Skip cache; always run a fresh scan")
@@ -113,11 +107,12 @@ func newPortsCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List local listening ports",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			out := output.New("json")
 			p, err := ports.ListListening()
 			if err != nil {
 				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "list ports")
 			}
-			return printJSON(p)
+			return out.Print(p)
 		},
 	})
 
@@ -126,6 +121,7 @@ func newPortsCmd() *cobra.Command {
 		Use:   "suggest",
 		Short: "Suggest free TCP ports in a range",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			out := output.New("json")
 			cfg, err := config.Load()
 			if err != nil {
 				slog.Warn("config load failed, using defaults", "err", err)
@@ -137,7 +133,7 @@ func newPortsCmd() *cobra.Command {
 			if !cmd.Flags().Changed("to") {
 				to = cfg.Ports.SuggestTo
 			}
-			return printJSON(map[string]any{"free": ports.SuggestFree(count, from, to)})
+			return out.Print(map[string]any{"free": ports.SuggestFree(count, from, to)})
 		},
 	}
 	suggest.Flags().IntVar(&count, "count", 3, "How many free ports to suggest")
@@ -157,6 +153,7 @@ func newMCPCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List discovered MCP servers",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			out := output.New("json")
 			servers, notes := mcpcfg.Discover(mcpcfg.DefaultSources())
 			if len(files) > 0 {
 				fileServers, fileNotes := mcpcfg.DiscoverFiles(files)
@@ -173,7 +170,7 @@ func newMCPCmd() *cobra.Command {
 					slog.Warn(n)
 				}
 			}
-			return printJSON(servers)
+			return out.Print(servers)
 		},
 	}
 	listCmd.Flags().BoolVar(&checkCredentials, "check-credentials", false, "Flag env values that look like exposed credentials")
@@ -250,6 +247,7 @@ func newMCPCmd() *cobra.Command {
 		Use:   "health",
 		Short: "Health-check discovered MCP servers",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			out := output.New("json")
 			servers, notes := mcpcfg.Discover(mcpcfg.DefaultSources())
 			if !probe {
 				results := make([]model.MCPHealthResult, len(servers))
@@ -261,9 +259,9 @@ func newMCPCmd() *cobra.Command {
 						slog.Warn(n)
 					}
 				}
-				return printJSON(results)
+				return out.Print(results)
 			}
-			return printJSON(mcphealth.ProbeAll(servers))
+			return out.Print(mcphealth.ProbeAll(servers))
 		},
 	}
 	health.Flags().BoolVar(&probe, "probe", false, "actually probe each server (WARNING: executes commands from MCP config files)")
@@ -278,7 +276,8 @@ func newClientsCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List known AI clients and whether their MCP config is present",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return printJSON(mcpcfg.FoundClients(mcpcfg.DefaultSources()))
+			out := output.New("json")
+			return out.Print(mcpcfg.FoundClients(mcpcfg.DefaultSources()))
 		},
 	})
 	return cmd
@@ -289,8 +288,9 @@ func newContainersCmd() *cobra.Command {
 		Use:   "containers",
 		Short: "List running containers and published ports",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			out := output.New("json")
 			c, notes := containers.List()
-			return printJSON(map[string]any{"containers": c, "notes": notes})
+			return out.Print(map[string]any{"containers": c, "notes": notes})
 		},
 	}
 }
@@ -300,6 +300,7 @@ func newConflictsCmd() *cobra.Command {
 		Use:   "conflicts",
 		Short: "Report ports bound by more than one process or occupied by configured services",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			out := output.New("json")
 			p, err := ports.ListListening()
 			if err != nil {
 				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "list ports")
@@ -307,7 +308,7 @@ func newConflictsCmd() *cobra.Command {
 			all := ports.Conflicts(p)
 			servers, _ := mcpcfg.Discover(mcpcfg.DefaultSources())
 			all = append(all, ports.MCPServerConflicts(servers, p)...)
-			return printJSON(all)
+			return out.Print(all)
 		},
 	}
 }
@@ -320,11 +321,12 @@ func newExplainCmd() *cobra.Command {
 		Use:   "port",
 		Short: "Explain what's using a specific port",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			out := output.New("json")
 			exp, err := explain.ExplainPort(port)
 			if err != nil {
 				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "explain port")
 			}
-			return printJSON(exp)
+			return out.Print(exp)
 		},
 	}
 	portCmd.Flags().IntVar(&port, "number", 0, "Port number to explain")
@@ -336,11 +338,12 @@ func newExplainCmd() *cobra.Command {
 		Use:   "server",
 		Short: "Explain a specific MCP server",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			out := output.New("json")
 			exp, err := explain.ExplainServer(serverName)
 			if err != nil {
 				return exitcodes.Wrap(err, exitcodes.ExitSoftware, exitcodes.KindInternal, "explain server")
 			}
-			return printJSON(exp)
+			return out.Print(exp)
 		},
 	}
 	serverCmd.Flags().StringVar(&serverName, "name", "", "Server name to explain")
@@ -357,7 +360,8 @@ func newCacheCmd() *cobra.Command {
 		Use:   "show",
 		Short: "Show cache status and metadata",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return printJSON(cache.Stats())
+			out := output.New("json")
+			return out.Print(cache.Stats())
 		},
 	})
 
@@ -378,8 +382,9 @@ func newCacheCmd() *cobra.Command {
 		Short:  "Print cache statistics as JSON",
 		Hidden: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
+			out := output.New("json")
 			fmt.Fprintln(os.Stderr, "warning: 'cache stats' is deprecated, use 'cache show' instead")
-			return printJSON(cache.Stats())
+			return out.Print(cache.Stats())
 		},
 	})
 
@@ -445,8 +450,7 @@ func newWatchCmd() *cobra.Command {
 				return exitcodes.Wrap(fmt.Errorf("interval must be greater than 0"), exitcodes.ExitConfig, exitcodes.KindValidation, "watch")
 			}
 
-			enc := json.NewEncoder(os.Stdout)
-			enc.SetEscapeHTML(false)
+			out := output.New("ndjson")
 
 			oldSnap, err := scan.Build()
 			if err != nil {
@@ -465,7 +469,7 @@ func newWatchCmd() *cobra.Command {
 
 				events := watch.Diff(oldSnap, newSnap)
 				for _, e := range events {
-					if err := enc.Encode(e); err != nil {
+					if err := out.Print(e); err != nil {
 						slog.Warn("failed to encode event", "err", err)
 					}
 				}
