@@ -12,6 +12,7 @@ import (
 
 	"github.com/danieljustus/symaira-corekit/fsutil"
 	"github.com/danieljustus/symaira-scope/internal/model"
+	"github.com/tailscale/hujson"
 	"gopkg.in/yaml.v3"
 )
 
@@ -77,8 +78,20 @@ func parseConfig(path, key string) (map[string]Entry, error) {
 }
 
 func parseJSONConfig(data []byte, key string) (map[string]Entry, error) {
+	// Use hujson for JSONC-aware parsing (handles comments, trailing commas).
+	ast, err := hujson.Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse json: %w", err)
+	}
+	// Standardize produces valid JSON, stripping comments and trailing commas.
+	packed := ast.Pack()
+	standard, err := hujson.Standardize(packed)
+	if err != nil {
+		return nil, fmt.Errorf("standardize json: %w", err)
+	}
+
 	var doc map[string]json.RawMessage
-	if err := json.Unmarshal(data, &doc); err != nil {
+	if err := json.Unmarshal(standard, &doc); err != nil {
 		return nil, fmt.Errorf("parse json: %w", err)
 	}
 	raw, ok := doc[key]
@@ -372,49 +385,42 @@ func FoundClients(sources []Source) []model.ClientConfig {
 // AddServer writes a new MCP server entry to a client's config file.
 // If the file doesn't exist, it creates it with the proper structure.
 func AddServer(source Source, name string, server Entry) error {
+	ext := strings.ToLower(filepath.Ext(source.Path))
+	isYAML := ext == ".yaml" || ext == ".yml"
+
+	// YAML path — keep existing unmarshal/marshal behaviour (comments
+	// and key-order are out of scope for YAML in this issue).
+	if isYAML {
+		return addServerYAML(source, name, server)
+	}
+
+	// JSONC-aware path.
 	data, err := os.ReadFile(source.Path)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("read config: %w", err)
-	}
-
-	var doc map[string]any
-	if err == nil {
-		ext := strings.ToLower(filepath.Ext(source.Path))
-		if ext == ".yaml" || ext == ".yml" {
-			if err := yaml.Unmarshal(data, &doc); err != nil {
-				return fmt.Errorf("parse yaml: %w", err)
-			}
-		} else {
-			if err := json.Unmarshal(data, &doc); err != nil {
-				return fmt.Errorf("parse json: %w", err)
-			}
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("read config: %w", err)
 		}
-	} else {
-		doc = make(map[string]any)
+		// File doesn't exist — create a new one.
+		return addServerNewFile(source, name, server)
 	}
 
-	servers, ok := doc[source.Key].(map[string]any)
-	if !ok {
-		servers = make(map[string]any)
+	// File exists — use the surgical JSONC splicer.
+	entryJSON, err := marshalEntry(server)
+	if err != nil {
+		return fmt.Errorf("marshal entry: %w", err)
+	}
+	out, err := jsoncAddMember(data, source.Key, name, entryJSON)
+	if err != nil {
+		// Key doesn't exist yet — add the whole key+value as a new
+		// top-level member.
+		serverObj := []byte(`{` + string(entryJSON) + `}`)
+		out, err = jsoncAddTopLevelKey(data, source.Key, serverObj)
+		if err != nil {
+			return fmt.Errorf("add top-level key: %w", err)
+		}
 	}
 
-	serverMap := map[string]any{
-		"command": server.Command,
-	}
-	if len(server.Args) > 0 {
-		serverMap["args"] = server.Args
-	}
-	if server.URL != "" {
-		serverMap["url"] = server.URL
-	}
-	if len(server.Env) > 0 {
-		serverMap["env"] = server.Env
-	}
-
-	servers[name] = serverMap
-	doc[source.Key] = servers
-
-	return writeConfig(source.Path, doc)
+	return writeJSON(source.Path, out)
 }
 
 // RemoveServer removes an MCP server entry from a client's config file.
@@ -424,31 +430,18 @@ func RemoveServer(source Source, name string) error {
 		return fmt.Errorf("read config: %w", err)
 	}
 
-	var doc map[string]any
 	ext := strings.ToLower(filepath.Ext(source.Path))
 	if ext == ".yaml" || ext == ".yml" {
-		if err := yaml.Unmarshal(data, &doc); err != nil {
-			return fmt.Errorf("parse yaml: %w", err)
-		}
-	} else {
-		if err := json.Unmarshal(data, &doc); err != nil {
-			return fmt.Errorf("parse json: %w", err)
-		}
+		return removeServerYAML(data, source, name)
 	}
 
-	servers, ok := doc[source.Key].(map[string]any)
-	if !ok {
-		return fmt.Errorf("no servers found under key %q", source.Key)
+	// JSONC-aware path.
+	out, err := jsoncRemoveMember(data, source.Key, name)
+	if err != nil {
+		return fmt.Errorf("remove server %q from %s config: %w", name, source.Client, err)
 	}
 
-	if _, exists := servers[name]; !exists {
-		return fmt.Errorf("server %q not found in %s config", name, source.Client)
-	}
-
-	delete(servers, name)
-	doc[source.Key] = servers
-
-	return writeConfig(source.Path, doc)
+	return writeJSON(source.Path, out)
 }
 
 // writeConfig marshals the document to the appropriate format and writes it
@@ -480,4 +473,113 @@ func writeConfig(path string, doc map[string]any) error {
 		return fmt.Errorf("marshal json: %w", err)
 	}
 	return fsutil.AtomicWriteFile(path, append(out, '\n'), perm)
+}
+
+// addServerYAML preserves the existing unmarshal/marshal behaviour for
+// YAML config files (comments and key-order are out of scope here).
+func addServerYAML(source Source, name string, server Entry) error {
+	data, err := os.ReadFile(source.Path)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read config: %w", err)
+	}
+
+	var doc map[string]any
+	if err == nil {
+		if err := yaml.Unmarshal(data, &doc); err != nil {
+			return fmt.Errorf("parse yaml: %w", err)
+		}
+	} else {
+		doc = make(map[string]any)
+	}
+
+	servers, ok := doc[source.Key].(map[string]any)
+	if !ok {
+		servers = make(map[string]any)
+	}
+
+	serverMap := map[string]any{
+		"command": server.Command,
+	}
+	if len(server.Args) > 0 {
+		serverMap["args"] = server.Args
+	}
+	if server.URL != "" {
+		serverMap["url"] = server.URL
+	}
+	if len(server.Env) > 0 {
+		serverMap["env"] = server.Env
+	}
+
+	servers[name] = serverMap
+	doc[source.Key] = servers
+
+	return writeConfig(source.Path, doc)
+}
+
+// addServerNewFile creates a new JSON config file with a single server entry.
+func addServerNewFile(source Source, name string, server Entry) error {
+	doc := make(map[string]any)
+	serverMap := map[string]any{
+		"command": server.Command,
+	}
+	if len(server.Args) > 0 {
+		serverMap["args"] = server.Args
+	}
+	if server.URL != "" {
+		serverMap["url"] = server.URL
+	}
+	if len(server.Env) > 0 {
+		serverMap["env"] = server.Env
+	}
+	doc[source.Key] = map[string]any{name: serverMap}
+	return writeConfig(source.Path, doc)
+}
+
+// removeServerYAML preserves the existing behaviour for YAML config files.
+func removeServerYAML(data []byte, source Source, name string) error {
+	var doc map[string]any
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("parse yaml: %w", err)
+	}
+
+	servers, ok := doc[source.Key].(map[string]any)
+	if !ok {
+		return fmt.Errorf("no servers found under key %q", source.Key)
+	}
+
+	if _, exists := servers[name]; !exists {
+		return fmt.Errorf("server %q not found in %s config", name, source.Client)
+	}
+
+	delete(servers, name)
+	doc[source.Key] = servers
+
+	return writeConfig(source.Path, doc)
+}
+
+// marshalEntry serialises an Entry to its compact JSON representation.
+func marshalEntry(server Entry) ([]byte, error) {
+	m := map[string]any{
+		"command": server.Command,
+	}
+	if len(server.Args) > 0 {
+		m["args"] = server.Args
+	}
+	if server.URL != "" {
+		m["url"] = server.URL
+	}
+	if len(server.Env) > 0 {
+		m["env"] = server.Env
+	}
+	return json.Marshal(m)
+}
+
+// writeJSON writes pre-formatted JSONC bytes atomically, preserving the
+// existing file's mode (default 0o600 for new files).
+func writeJSON(path string, data []byte) error {
+	perm := os.FileMode(0o600)
+	if info, err := os.Stat(path); err == nil {
+		perm = info.Mode().Perm()
+	}
+	return fsutil.AtomicWriteFile(path, append(data, '\n'), perm)
 }
