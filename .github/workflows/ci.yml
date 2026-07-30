@@ -55,10 +55,10 @@ jobs:
           persist-credentials: false
       - name: Check Go/Swift schema version alignment
         run: |
-          GO_VERSION=$(sed -n 's/.*versionkit.New("symscope", version, \([0-9]*\)).*/\1/p' cmd/symscope/main.go | head -1)
+          GO_VERSION=$(sed -n 's/.*versionkit.New("symscope", version, \([0-9]*\)).*/\1/p' cmd/symscope/*.go | head -1)
           SWIFT_VERSION=$(sed -n 's/.*expectedSchemaVersion = \([0-9]*\).*/\1/p' client/Sources/SymscopeFeature/SymscopeModule.swift | head -1)
           if [ -z "$GO_VERSION" ]; then
-            echo "::error::Could not extract schema version from cmd/symscope/main.go"
+            echo "::error::Could not extract schema version from cmd/symscope/*.go"
             exit 1
           fi
           if [ -z "$SWIFT_VERSION" ]; then
