@@ -2,9 +2,11 @@
 
 > Inventory local ports, containers, and MCP servers — for AI dev environments.
 
+![Symaira Scope social preview](docs/assets/social-preview.png)
+
 `symscope` shows, from one place: what's **listening** on your machine, which
 **MCP servers** your AI clients (Claude Desktop/Code, Cursor, VS Code, Windsurf,
-project-local) have configured, and — soon — your **Docker-published** ports. It
+project-local) have configured, and your **Docker-published** ports. It
 runs as a CLI and as an **MCP server**, so an agent can ask "what's on port 3000?"
 or "give me three free ports" itself.
 
@@ -54,7 +56,7 @@ Register `symscope serve` with any MCP host:
 { "mcpServers": { "symscope": { "command": "/abs/path/symscope", "args": ["serve"] } } }
 ```
 
-Tools: `scan`, `ports_list`, `ports_suggest`, `mcp_list`, `conflicts`.
+Tools: `scan`, `ports_list`, `ports_suggest`, `mcp_list`, `conflicts`, `mcp_health`.
 
 `scan` and `mcp list --check-credentials` include a `credential_warnings` field per
 server when an `env` value looks like an exposed API key or token (e.g. `sk-...`,
@@ -63,8 +65,7 @@ placeholders are ignored.
 
 ## Documentation
 
-- [docs/architecture.md](docs/architecture.md) — design & data flow
-- [docs/roadmap.md](docs/roadmap.md) — built vs planned
+- [docs/architecture.md](docs/architecture.md) — design & data flow (local only; `docs/` is no longer tracked in git — planning lives in GitHub Issues/Milestones)
 - [AGENTS.md](AGENTS.md) — contributor/agent guidance
 
 ## License

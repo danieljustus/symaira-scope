@@ -102,10 +102,11 @@ if [ -z "${APP_PATH:-}" ] || [ ! -d "${APP_PATH}" ]; then
 fi
 
 echo "Creating DMG..."
-hdiutil create -volname "${APP_NAME}" \
-    -srcfolder "${APP_PATH}" \
-    -ov -format UDZO \
-    "${DMG_PATH}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"${SCRIPT_DIR}/create-symaira-dmg.sh" \
+    "${APP_PATH}" \
+    "${DMG_PATH}" \
+    "Symaira Scope"
 
 echo "Uploading to GitHub..."
 # If the release already exists, upload the DMG to it, otherwise create it.
