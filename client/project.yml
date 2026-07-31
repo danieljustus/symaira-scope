@@ -57,6 +57,11 @@ targets:
             mkdir -p "$DST"
             cp "$SRC" "$DST/symscope"
             chmod +x "$DST/symscope"
+            # Sign the embedded engine with the hardened runtime so
+            # notarization accepts the app bundle.
+            if [ -n "${CODESIGN_IDENTITY:-}" ]; then
+              codesign -s "$CODESIGN_IDENTITY" --timestamp --options runtime "$DST/symscope"
+            fi
             echo "Embedded symscope binary into $DST/symscope"
           else
             echo "error: symscope binary not found at $SRC"
