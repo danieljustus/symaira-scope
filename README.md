@@ -12,10 +12,11 @@ or "give me three free ports" itself.
 
 Part of the [Symaira](../ECOSYSTEM.md) family (Go core, MIT, corekit-based).
 
-> **Status: v0.2.0** — adds a `watch` mode for ports, conflicts, and MCP configs,
-> detects likely-exposed credentials in MCP server env blocks, and discovers six
-> more AI clients. Ports, MCP-discovery, Docker containers, conflicts, caching,
-> health probes, and more all work. Cross-platform (macOS, Linux, Windows).
+> **Status: v0.3.0** — MCP tool results are now schema-valid for strict
+> clients (TextContent serialization fix in corekit v0.8.0), surgical JSONC
+> config editing for AI-client MCP configs (`mcp add`/`mcp remove`), a shared
+> Reporter interface for JSON/NDJSON output, and a branded DMG for the macOS
+> app. Cross-platform (macOS, Linux, Windows).
 
 ## Install (from source)
 
