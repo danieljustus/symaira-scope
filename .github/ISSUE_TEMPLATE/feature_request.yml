@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose an improvement to symaira-scope.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Do not include passwords, API keys, access tokens,
+        private configuration values, or other secrets. Use the private security
+        reporting process for vulnerabilities.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What user problem, limitation, or workflow gap should this address?
+      placeholder: Explain who is affected and why the current behavior is insufficient.
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should symaira-scope make possible, and how would success be measured?
+      placeholder: Describe the behavior or result you would like.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed scope
+      description: Identify the affected surface, such as the CLI, MCP server, discovery output, configuration editing, or optional macOS client. Call out important boundaries.
+      placeholder: |
+        Affected surface:
+        In scope:
+        Out of scope:
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternative approaches have you tried?
+      placeholder: Describe any existing commands, tools, or approaches you considered.
+    validations:
+      required: false
