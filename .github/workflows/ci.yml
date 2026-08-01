@@ -5,15 +5,11 @@ on:
     branches: [main]
     paths-ignore:
       - 'docs/**'
-      - '**.md'
       - 'LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
   pull_request:
     paths-ignore:
       - 'docs/**'
-      - '**.md'
       - 'LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
   schedule:
     - cron: '59 5 * * 1'  # weekly Monday 05:59 UTC — full suite incl. macOS/windows
 
