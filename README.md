@@ -1,8 +1,10 @@
 # symaira-scope
 
-> Inventory local ports, containers, and MCP servers — for AI dev environments.
+[![CI](https://github.com/danieljustus/symaira-scope/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/danieljustus/symaira-scope/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/danieljustus/symaira-scope)](https://github.com/danieljustus/symaira-scope/releases/latest)
+[![License](https://img.shields.io/github/license/danieljustus/symaira-scope)](LICENSE)
 
-![Symaira Scope social preview](docs/assets/social-preview.png)
+> Inventory local ports, containers, and MCP servers — for AI dev environments.
 
 `symscope` shows, from one place: what's **listening** on your machine, which
 **MCP servers** your AI clients (Claude Desktop/Code, Cursor, VS Code, Windsurf,
@@ -10,7 +12,7 @@ project-local) have configured, and your **Docker-published** ports. It
 runs as a CLI and as an **MCP server**, so an agent can ask "what's on port 3000?"
 or "give me three free ports" itself.
 
-Part of the [Symaira](../ECOSYSTEM.md) family (Go core, MIT, corekit-based).
+Part of the [Symaira](https://github.com/danieljustus) family (Go core, Apache-2.0, corekit-based).
 
 > **Status: v0.3.0** — MCP tool results are now schema-valid for strict
 > clients (TextContent serialization fix in corekit v0.8.0), surgical JSONC
@@ -18,7 +20,31 @@ Part of the [Symaira](../ECOSYSTEM.md) family (Go core, MIT, corekit-based).
 > Reporter interface for JSON/NDJSON output, and a branded DMG for the macOS
 > app. Cross-platform (macOS, Linux, Windows).
 
-## Install (from source)
+## Install
+
+### Homebrew
+
+```bash
+brew install danieljustus/tap/symscope
+```
+
+### Go
+
+Install the latest version from source:
+
+```bash
+go install github.com/danieljustus/symaira-scope/cmd/symscope@latest
+```
+
+The `symscope` binary is installed to Go's binary directory, which should be on
+your `PATH`.
+
+### Prebuilt releases
+
+Download the archive for macOS, Linux, or Windows from the
+[latest release](https://github.com/danieljustus/symaira-scope/releases/latest).
+
+### Build from source
 
 ```bash
 git clone https://github.com/danieljustus/symaira-scope && cd symaira-scope
@@ -66,9 +92,17 @@ placeholders are ignored.
 
 ## Documentation
 
-- [docs/architecture.md](docs/architecture.md) — design & data flow (local only; `docs/` is no longer tracked in git — planning lives in GitHub Issues/Milestones)
 - [AGENTS.md](AGENTS.md) — contributor/agent guidance
+- [Releases](https://github.com/danieljustus/symaira-scope/releases) — prebuilt binaries and release notes
+
+## Test
+
+Run the full Go test suite with:
+
+```bash
+go test ./...
+```
 
 ## License
 
-MIT © 2026 Daniel Justus.
+Apache-2.0 © 2026 Daniel Justus. See [LICENSE](LICENSE).
