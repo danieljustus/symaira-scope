@@ -25,25 +25,23 @@ permissions:
   contents: read
 
 jobs:
-  # Lint disabled temporarily: golangci-lint v1.64.x built with Go 1.24
-  # cannot parse Go 1.26 code. Re-enable when golangci-lint releases a
-  # version built with Go 1.26+.
-  #
-  # lint:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-  #       with:
-  #         persist-credentials: false
-  #     - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-  #       with:
-  #         go-version-file: go.mod
-  #         cache: false
-  #     - name: golangci-lint
-  #       uses: golangci/golangci-lint-action@v6
-  #       with:
-  #         version: v1.64.8
-  #         args: --timeout=5m
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a # v8
+        with:
+          version: v2.12.2
+          args: --timeout=5m
 
   schema-sync:
     runs-on: ubuntu-latest
