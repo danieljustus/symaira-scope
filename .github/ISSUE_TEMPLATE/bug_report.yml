@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a reproducible problem in symaira-scope.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve symaira-scope. Please remove or redact all
+        passwords, API keys, access tokens, private paths, and other secrets.
+        Do not paste secret-bearing MCP configuration or unredacted environment
+        output here. Report security vulnerabilities privately using the link
+        in the repository's security policy.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem, including the command, MCP tool, or macOS client action involved.
+      placeholder: Tell us what you observed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect symaira-scope to do instead?
+      placeholder: Describe the expected result.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest safe, repeatable sequence that demonstrates the issue.
+      placeholder: |
+        1. Run ...
+        2. Configure ... (with secrets redacted)
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include symscope version or commit, OS and architecture, Go version when relevant, and the invocation used.
+      placeholder: |
+        - symscope version:
+        - OS/architecture:
+        - Go version:
+        - Command or client:
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or output
+      description: Paste the smallest relevant excerpt. Redact secrets, tokens, credentials, private hostnames, and sensitive paths before submitting.
+      render: shell
+    validations:
+      required: false
