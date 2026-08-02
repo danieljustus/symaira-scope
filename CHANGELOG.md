@@ -5,6 +5,38 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-08-01
+
+### Fixed
+- Hardened macOS release signing, App Store Connect notarization, embedded-engine signing, and DMG publishing.
+
+### Changed
+- Refreshed the private `symaira-appkit` resolution used by the macOS client to v0.2.0.
+
+### Infrastructure
+- Re-enabled CGO-free Go linting with the golangci-lint v2 configuration.
+- Pinned the CodeQL action to v4.37.4 and configured a Dependabot cooldown.
+- Added contributor guidance, issue forms, a pull-request template, and a Code of Conduct.
+- Improved README onboarding and installation instructions.
+
+## [0.3.0] — 2026-07-31
+
+### Added
+- Native macOS Swift GUI client, styled in obsidian and gold, embeddable as a module in symaira-hub.
+- `watch` mode for streaming ports, conflicts, and MCP-config changes as NDJSON.
+- Credential-leak detection for MCP server environment blocks.
+- MCP config discovery for Kiro, Qoder, Copilot CLI, LM Studio, Google Antigravity, and Gemini CLI, plus a generic `--files` schema fallback.
+- `versionkit` handshake integration and the `version --json` flag.
+
+### Changed
+- Discovery and read paths remain read-only and network-free; `mcp add` and `mcp rm` are the intentional config-mutation surface.
+- Bumped `symaira-corekit` to v0.5.0 and `gopsutil` to v4.26.6.
+
+### Infrastructure
+- Added the native macOS GUI client module and branded DMG release asset.
+- Planning documentation moved from the repository into GitHub Issues and Milestones.
+- Bumped `actions/setup-go` to v7.
+
 ## [0.2.0] — 2026-07-20
 
 ### Added
