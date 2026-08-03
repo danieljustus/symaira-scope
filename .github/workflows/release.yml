@@ -18,6 +18,31 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Validate Xcode toolchain
+        run: |
+          set -euo pipefail
+          DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select --print-path)}"
+          if [ "$DEVELOPER_DIR" = "/Library/Developer/CommandLineTools" ]; then
+            echo "::error::The macOS runner selected CommandLineTools instead of a full Xcode installation."
+            exit 1
+          fi
+          if [ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ]; then
+            echo "::error::No xcodebuild executable was found in the selected developer directory."
+            exit 1
+          fi
+          XCODE_VERSION="$(DEVELOPER_DIR="$DEVELOPER_DIR" xcodebuild -version | awk '$1 == "Xcode" { print $2; exit }')"
+          if [ "$XCODE_VERSION" != "16.4" ]; then
+            echo "::error::Xcode 16.4 is required on macos-15; found ${XCODE_VERSION:-unknown}."
+            exit 1
+          fi
+          if ! DEVELOPER_DIR="$DEVELOPER_DIR" xcrun --find xcodebuild >/dev/null; then
+            echo "::error::The selected Xcode toolchain could not resolve xcodebuild through xcrun."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          echo "XCODE_VERSION=$XCODE_VERSION" >> "$GITHUB_ENV"
+          echo "Using Xcode $XCODE_VERSION from $DEVELOPER_DIR"
+
       - name: Import signing certificate
         id: signing
         env:
@@ -113,6 +138,27 @@ jobs:
         run: |
           cd client
           xcodegen generate
+
+      - name: Xcode archive smoke test
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          SMOKE_ARCHIVE_PATH="client/build/release/smoke/Symscope.xcarchive"
+          rm -rf "$(dirname "$SMOKE_ARCHIVE_PATH")"
+          xcodebuild archive \
+            -project client/Symscope.xcodeproj \
+            -scheme Symscope \
+            -archivePath "$SMOKE_ARCHIVE_PATH" \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            MARKETING_VERSION="${VERSION}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+          if [ ! -d "$SMOKE_ARCHIVE_PATH" ]; then
+            echo "::error::Xcode archive smoke test did not produce an archive."
+            exit 1
+          fi
 
       - name: Build and archive Swift App (signed)
         if: steps.signing.outputs.signed == 'true'
