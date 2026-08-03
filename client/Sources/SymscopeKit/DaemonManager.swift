@@ -8,6 +8,18 @@ public enum DaemonState: Sendable, Equatable {
     case failed(String)
 }
 
+private final class ProcessLifetime {
+    let process: Process
+
+    init(process: Process) {
+        self.process = process
+    }
+
+    deinit {
+        process.terminate()
+    }
+}
+
 @Observable
 @MainActor
 public final class DaemonManager {
@@ -18,7 +30,7 @@ public final class DaemonManager {
         state == .running
     }
 
-    nonisolated(unsafe) private var process: Process?
+    private var processLifetime: ProcessLifetime?
     private var stdoutFH: FileHandle?
     private var stderrFH: FileHandle?
     
@@ -26,8 +38,8 @@ public final class DaemonManager {
 
     public init() {}
 
-    nonisolated deinit {
-        process?.terminate()
+    private var process: Process? {
+        processLifetime?.process
     }
 
     private func locateBinary() -> URL? {
@@ -126,7 +138,7 @@ public final class DaemonManager {
 
         do {
             try proc.run()
-            self.process = proc
+            self.processLifetime = ProcessLifetime(process: proc)
             self.state = .running
             appendLog("[daemon] Process started (PID \(proc.processIdentifier))")
         } catch {
@@ -159,7 +171,7 @@ public final class DaemonManager {
         stderrFH?.readabilityHandler = nil
         stdoutFH = nil
         stderrFH = nil
-        process = nil
+        processLifetime = nil
     }
 
     private func processOutput(_ text: String, source: String) {
