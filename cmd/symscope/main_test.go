@@ -52,13 +52,40 @@ func runCLI(t *testing.T, args ...string) (string, error) {
 	return read(), err
 }
 
+func isolateCLIHome(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	return home
+}
+
+func expectCLIError(t *testing.T, args []string, wantCode exitcodes.ExitCode, wantMessage string) {
+	t.Helper()
+	_, err := runCLI(t, args...)
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	if code := exitcodes.ExitCodeFromError(err); code != wantCode {
+		t.Errorf("exit code = %d, want %d", code, wantCode)
+	}
+	if !strings.Contains(err.Error(), wantMessage) {
+		t.Errorf("error %q does not contain %q", err, wantMessage)
+	}
+}
+
+func runIsolatedCLIProcess(t *testing.T, args ...string) (string, string, int) {
+	t.Helper()
+	return runCLIProcess(t, []string{
+		"HOME=" + t.TempDir(),
+		"XDG_CACHE_HOME=" + t.TempDir(),
+	}, args...)
+}
+
 func TestVersion(t *testing.T) {
 	out, err := runCLI(t, "version")
 	if err != nil {
 		t.Fatalf("version failed: %v", err)
-	}
-	if code := exitcodes.ExitCodeFromError(err); code != exitcodes.ExitOK {
-		t.Errorf("exit code = %d, want %d", code, exitcodes.ExitOK)
 	}
 	if !strings.Contains(out, ver.Version) {
 		t.Errorf("output %q does not contain version %q", out, ver.Version)
@@ -100,16 +127,7 @@ func TestWatchValidation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := runCLI(t, tt.args...)
-			if err == nil {
-				t.Fatal("expected an error, got nil")
-			}
-			if code := exitcodes.ExitCodeFromError(err); code == exitcodes.ExitOK {
-				t.Errorf("exit code = %d, want non-zero", code)
-			}
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf("error %q does not contain %q", err, tt.wantErr)
-			}
+			expectCLIError(t, tt.args, exitcodes.ExitConfig, tt.wantErr)
 		})
 	}
 }
@@ -117,10 +135,7 @@ func TestWatchValidation(t *testing.T) {
 func TestMCPAddRemoveValidation(t *testing.T) {
 	// Isolated HOME: DefaultSources() resolves every known client path under
 	// this temp dir, and any file a buggy validation path might write would
-	// land here where the test can detect it.
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	home := isolateCLIHome(t)
 
 	tests := []struct {
 		name    string
@@ -133,16 +148,7 @@ func TestMCPAddRemoveValidation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := runCLI(t, tt.args...)
-			if err == nil {
-				t.Fatal("expected an error, got nil")
-			}
-			if code := exitcodes.ExitCodeFromError(err); code != exitcodes.ExitConfig {
-				t.Errorf("exit code = %d, want %d", code, exitcodes.ExitConfig)
-			}
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf("error %q does not contain %q", err, tt.wantErr)
-			}
+			expectCLIError(t, tt.args, exitcodes.ExitConfig, tt.wantErr)
 			// Validation must fail before any config file is written.
 			entries, err := os.ReadDir(home)
 			if err != nil {
@@ -158,14 +164,50 @@ func TestMCPAddRemoveValidation(t *testing.T) {
 func TestPortsSuggestConfigFallback(t *testing.T) {
 	// A broken SYMSCOPE_* env value makes config.Load() fail; the suggest
 	// command must fall back to defaults (ports.go lines 37-41) and succeed.
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	isolateCLIHome(t)
 	t.Setenv("SYMSCOPE_PORTS_SUGGEST_FROM", "not-an-int")
 	t.Setenv("SYMSCOPE_PORTS_SUGGEST_TO", "")
 	_, err := runCLI(t, "ports", "suggest", "--count", "1")
 	if err != nil {
 		t.Fatalf("ports suggest with broken config should fall back to defaults: %v", err)
 	}
+}
+
+func TestCommandOutputCommands(t *testing.T) {
+	for _, args := range [][]string{
+		{"cache", "show"},
+		{"cache", "stats"},
+		{"clients", "list"},
+		{"containers"},
+		{"ports", "list"},
+		{"explain", "port", "--number", "1"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			out, stderr, code := runIsolatedCLIProcess(t, args...)
+			if code != 0 {
+				t.Fatalf("%v failed with exit code %d (stderr: %s)", args, code, stderr)
+			}
+			var value any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &value); err != nil {
+				t.Fatalf("%v output %q is not valid JSON: %v", args, out, err)
+			}
+		})
+	}
+}
+
+func TestCacheClearCommand(t *testing.T) {
+	out, stderr, code := runIsolatedCLIProcess(t, "cache", "clear")
+	if code != 0 {
+		t.Fatalf("cache clear failed with exit code %d (stderr: %s)", code, stderr)
+	}
+	if strings.TrimSpace(out) != "Cache cleared." {
+		t.Errorf("cache clear output = %q, want %q", out, "Cache cleared.")
+	}
+}
+
+func TestExplainServerMissing(t *testing.T) {
+	isolateCLIHome(t)
+	expectCLIError(t, []string{"explain", "server", "--name", "missing"}, exitcodes.ExitSoftware, "not found")
 }
 
 // TestHelperProcess is the re-exec entry point for subprocess-based tests:
