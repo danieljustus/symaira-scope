@@ -7,11 +7,13 @@ import (
 )
 
 // writeGlobalConfig writes $HOME/.config/symscope/config.toml and points HOME
-// at an isolated temp dir so no real user state is touched.
+// (and USERPROFILE, which os.UserHomeDir reads on Windows) at an isolated temp
+// dir so no real user state is touched.
 func writeGlobalConfig(t *testing.T, content string) {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	dir := filepath.Join(home, ".config", "symscope")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -32,7 +34,9 @@ func TestDefaults(t *testing.T) {
 }
 
 func TestLoadNoConfigFile(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	t.Setenv("SYMSCOPE_PORTS_SUGGEST_FROM", "")
 	t.Setenv("SYMSCOPE_PORTS_SUGGEST_TO", "")
 	loader.ResetCache()
