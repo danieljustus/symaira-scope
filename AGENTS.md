@@ -56,7 +56,7 @@ local `docs/` directory is no longer tracked in git.
 - SwiftUI app: local SPM package `SymscopeClient` (SymscopeKit) + XcodeGen app
   target (`cd client && xcodegen generate`, scheme `Symscope`). Local builds
   need `DEVELOPER_DIR` pointing at Xcode (CommandLineTools lack XCTest).
-- Depends on the shared **symaira-appkit** package, pinned exact (`0.2.0`) in
+- Depends on the shared **symaira-appkit** package, pinned exact (`0.7.0`) in
   `client/Package.swift` (SymscopeKit → SymairaCLIRunner, SymairaToolKit,
   SymairaTheme). `client/project.yml` pulls appkit transitively through the
   local SymscopeClient package rather than pinning it directly — keep that

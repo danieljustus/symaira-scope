@@ -5,6 +5,20 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-08-05
+
+### Fixed
+- Fixed Windows configuration tests to isolate `USERPROFILE` alongside `HOME`.
+- Fixed MCP config editing when adding a server to a document without an existing `mcpServers` key.
+
+### Changed
+- Centralized the CLI and MCP health-probe version source and aligned the macOS client with `symaira-appkit` v0.7.0.
+- Added CLI/config and stdio health-probe coverage, raising overall Go coverage to 80.2%.
+- Expanded the README with a terminal demo and a comparison of symscope's local discovery workflows.
+
+### Infrastructure
+- Hardened the macOS release workflow with Xcode 16.4 validation and an archive smoke test.
+
 ## [0.3.1] — 2026-08-01
 
 ### Fixed

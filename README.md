@@ -14,7 +14,7 @@ or "give me three free ports" itself.
 
 Part of the [Symaira](https://github.com/danieljustus) family (Go core, Apache-2.0, corekit-based).
 
-> **Status: v0.3.1** — MCP tool results are now schema-valid for strict
+> **Status: v0.3.2** — MCP tool results are now schema-valid for strict
 > clients (TextContent serialization fix in corekit v0.8.0), surgical JSONC
 > config editing for AI-client MCP configs (`mcp add`/`mcp remove`), a shared
 > Reporter interface for JSON/NDJSON output, and a branded DMG for the macOS
