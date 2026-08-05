@@ -20,6 +20,55 @@ Part of the [Symaira](https://github.com/danieljustus) family (Go core, Apache-2
 > Reporter interface for JSON/NDJSON output, and a branded DMG for the macOS
 > app. Cross-platform (macOS, Linux, Windows).
 
+## Demo
+
+```console
+$ symscope scan | head -30
+{
+  "generated_at": "2026-08-05T12:21:35Z",
+  "ports": [
+    { "port": 5000, "protocol": "tcp", "address": "*", "pid": 666, "process": "ControlCenter" },
+    { "port": 7000, "protocol": "tcp", "address": "127.0.0.1", "pid": 1024, "process": "node" }
+  ],
+  "mcp_servers": [
+    { "name": "flutter-skill", "client": "claude-code", "transport": "stdio", "command": "npx" },
+    { "name": "github", "client": "cursor", "transport": "stdio", "command": "gh" }
+  ],
+  "containers": [
+    { "name": "postgres", "image": "postgres:16", "ports": ["5432/tcp -> 0.0.0.0:5432"] }
+  ]
+}
+
+$ symscope ports suggest --count 3
+{ "free": [3000, 3001, 3002] }
+```
+
+## Why symscope
+
+One command answers the questions AI dev setups keep asking — no scripting
+together `lsof`, `docker ps`, and a pile of client config files:
+
+- **One CLI + one MCP server** — the same inventory powers your terminal *and*
+  your agents (`scan`, `ports_suggest`, `mcp_health`, ... as MCP tools).
+- **Read-only and local** — discovery never mutates your configs and makes no
+  network calls; only the explicit `mcp add` / `mcp remove` commands write,
+  atomically, preserving file permissions.
+- **Cross-client MCP discovery** — Claude Desktop/Code, Cursor, VS Code,
+  Windsurf, and more, including a `--check-credentials` flag that flags env
+  values that look like exposed secrets.
+- **No Docker daemon dependency** — container info comes from the local `docker`
+  CLI; port inventory uses gopsutil, so it works even where Docker isn't running.
+- **Free ports & conflicts** — `ports suggest` hands your dev servers a free
+  port; `conflicts` finds ports bound by more than one process.
+
+| Task | Without symscope | With symscope |
+|---|---|---|
+| What's listening on 3000? | `lsof -i :3000` + parse | `symscope scan` |
+| Free port for a new server | `lsof` loop / trial-and-error | `symscope ports suggest` |
+| MCP servers configured across clients | read each client's JSON/YAML by hand | `symscope mcp list` |
+| Published container ports | `docker ps` + format | `symscope containers` |
+| Ports bound twice | cross-check `lsof` output | `symscope conflicts` |
+
 ## Install
 
 ### Homebrew
