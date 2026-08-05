@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/danieljustus/symaira-scope/internal/model"
+	"github.com/danieljustus/symaira-scope/internal/version"
 )
 
 const probeTimeout = 5 * time.Second
@@ -142,7 +143,7 @@ func initRequest() map[string]any {
 			"capabilities":    map[string]any{},
 			"clientInfo": map[string]any{
 				"name":    "symscope",
-				"version": "0.2.0",
+				"version": version.Version,
 			},
 		},
 	}
