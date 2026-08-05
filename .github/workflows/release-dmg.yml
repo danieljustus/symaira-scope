@@ -1,0 +1,214 @@
+name: Release DMG
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub release tag to build and upload a DMG for
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release-dmg:
+    runs-on: macos-15
+    environment: release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate Xcode toolchain
+        run: |
+          set -euo pipefail
+          DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select --print-path)}"
+          if [ "$DEVELOPER_DIR" = "/Library/Developer/CommandLineTools" ]; then
+            echo "::error::The macOS runner selected CommandLineTools instead of a full Xcode installation."
+            exit 1
+          fi
+          if [ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ]; then
+            echo "::error::No xcodebuild executable was found in the selected developer directory."
+            exit 1
+          fi
+          XCODE_VERSION="$(DEVELOPER_DIR="$DEVELOPER_DIR" xcodebuild -version | awk '$1 == "Xcode" { version = $2 } END { print version }')"
+          if [ "$XCODE_VERSION" != "16.4" ]; then
+            echo "::error::Xcode 16.4 is required on macos-15; found ${XCODE_VERSION:-unknown}."
+            exit 1
+          fi
+          if ! DEVELOPER_DIR="$DEVELOPER_DIR" xcrun --find xcodebuild >/dev/null; then
+            echo "::error::The selected Xcode toolchain could not resolve xcodebuild through xcrun."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          echo "XCODE_VERSION=$XCODE_VERSION" >> "$GITHUB_ENV"
+          echo "Using Xcode $XCODE_VERSION from $DEVELOPER_DIR"
+
+      - name: Import signing certificate
+        id: signing
+        env:
+          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CERTIFICATE_P12:-}" ] || [ -z "${CERTIFICATE_PASSWORD:-}" ]; then
+            echo "::error::Signing certificate secrets are required."
+            exit 1
+          fi
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          CERTIFICATE_PATH="$RUNNER_TEMP/certificate.p12"
+          echo -n "$CERTIFICATE_P12" | base64 --decode -o "$CERTIFICATE_PATH"
+          security import "$CERTIFICATE_PATH" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | awk -F'"' '/Developer ID Application/ { identity=$2 } END { print identity }')
+          if [ -z "${IDENTITY:-}" ]; then
+            echo "::error::No Developer ID Application identity was imported."
+            exit 1
+          fi
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "CODESIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: "1.26.x"
+          cache: false
+
+      - name: Configure git credentials for private SPM dependencies
+        env:
+          APPKIT_GITHUB_TOKEN: ${{ secrets.APPKIT_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPKIT_GITHUB_TOKEN:-}" ]; then
+            echo "::error::APPKIT_GITHUB_TOKEN secret is not set."
+            exit 1
+          fi
+          git config --global "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$APPKIT_GITHUB_TOKEN" | base64)"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: |
+          set -euo pipefail
+          cd client
+          xcodegen generate
+
+      - name: Build and archive Swift App
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.tag }}"
+          VERSION="${VERSION#v}"
+          xcodebuild archive \
+            -project client/Symscope.xcodeproj \
+            -scheme Symscope \
+            -archivePath client/build/release/Symscope.xcarchive \
+            -configuration Release \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=M4744F3TAA \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+            CODE_SIGNING_ALLOWED=YES
+
+      - name: Export Swift App
+        run: |
+          set -euo pipefail
+          cat > client/build/release/ExportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>developer-id</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>signingCertificate</key>
+              <string>Developer ID Application</string>
+              <key>teamID</key>
+              <string>M4744F3TAA</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath client/build/release/Symscope.xcarchive \
+            -exportOptionsPlist client/build/release/ExportOptions.plist \
+            -exportPath client/build/release/export
+
+      - name: Notarize and staple Swift App
+        env:
+          NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
+          NOTARY_API_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find client/build/release/export -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::No .app found for notarization."
+            exit 1
+          fi
+          NOTARY_KEY_PATH="$RUNNER_TEMP/notary-api-key.p8"
+          if [ -z "${NOTARY_API_KEY:-}" ] || [ -z "${NOTARY_API_KEY_ID:-}" ] || [ -z "${NOTARY_API_ISSUER:-}" ]; then
+            echo "::error::Complete App Store Connect notarization credentials are required."
+            exit 1
+          fi
+          printf '%s' "$NOTARY_API_KEY" | base64 --decode > "$NOTARY_KEY_PATH"
+          chmod 600 "$NOTARY_KEY_PATH"
+          NOTARY_ZIP_PATH="$RUNNER_TEMP/symscope-notarize.zip"
+          ditto -c -k --keepParent --sequesterRsrc "$APP_PATH" "$NOTARY_ZIP_PATH"
+          xcrun notarytool submit "$NOTARY_ZIP_PATH" \
+            --key "$NOTARY_KEY_PATH" \
+            --key-id "$NOTARY_API_KEY_ID" \
+            --issuer "$NOTARY_API_ISSUER" \
+            --wait
+          xcrun stapler staple "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+
+      - name: Create DMG
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.tag }}"
+          VERSION="${VERSION#v}"
+          APP_PATH=$(find client/build/release/export -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::No .app found for DMG creation."
+            exit 1
+          fi
+          hdiutil create -volname "Symscope" \
+            -srcfolder "$APP_PATH" \
+            -ov -format UDZO \
+            "client/build/release/Symscope-${VERSION}.dmg"
+
+      - name: Upload DMG to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.tag }}"
+          VERSION="${VERSION#v}"
+          DMG_PATH="client/build/release/Symscope-${VERSION}.dmg"
+          test -s "$DMG_PATH"
+          gh release upload "${{ inputs.tag }}" \
+            "${DMG_PATH}#Symscope-${VERSION}.dmg" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Clean up signing material
+        if: always()
+        run: |
+          if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          fi
+          if [ -n "${NOTARY_KEY_PATH:-}" ] && [ -f "$NOTARY_KEY_PATH" ]; then
+            rm -f "$NOTARY_KEY_PATH"
+          fi
+          git config --global --unset-all "http.https://github.com/.extraheader" 2>/dev/null || true
