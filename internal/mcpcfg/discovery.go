@@ -412,8 +412,14 @@ func AddServer(source Source, name string, server Entry) error {
 	out, err := jsoncAddMember(data, source.Key, name, entryJSON)
 	if err != nil {
 		// Key doesn't exist yet — add the whole key+value as a new
-		// top-level member.
-		serverObj := []byte(`{` + string(entryJSON) + `}`)
+		// top-level member. The value must be a complete JSON object
+		// mapping the server name to its entry; previously the name was
+		// omitted, producing invalid JSONC ({{...}}) that always failed
+		// to parse.
+		serverObj, err := json.Marshal(map[string]Entry{name: server})
+		if err != nil {
+			return fmt.Errorf("marshal server object: %w", err)
+		}
 		out, err = jsoncAddTopLevelKey(data, source.Key, serverObj)
 		if err != nil {
 			return fmt.Errorf("add top-level key: %w", err)
