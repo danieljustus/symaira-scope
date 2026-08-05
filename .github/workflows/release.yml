@@ -232,12 +232,15 @@ jobs:
             echo "::error::Notarization key was not prepared."
             exit 1
           fi
-          xcrun notarytool submit "$APP_PATH" \
+          NOTARY_ZIP_PATH="$RUNNER_TEMP/symscope-notarize.zip"
+          ditto -c -k --keepParent --sequesterRsrc "$APP_PATH" "$NOTARY_ZIP_PATH"
+          xcrun notarytool submit "$NOTARY_ZIP_PATH" \
             --key "$NOTARY_KEY_PATH" \
             --key-id "${NOTARY_API_KEY_ID}" \
             --issuer "${NOTARY_API_ISSUER}" \
             --wait
           xcrun stapler staple "$APP_PATH"
+          rm -f "$NOTARY_ZIP_PATH"
 
       - name: Create DMG
         run: |
