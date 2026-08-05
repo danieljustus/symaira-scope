@@ -1,8 +1,9 @@
 BINARY := symscope
 PKG := ./cmd/symscope
 GOLANGCI_LINT ?= golangci-lint
+VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
 
-.PHONY: build test vet lint run serve clean
+.PHONY: build test vet lint run serve install clean
 
 build:
 	CGO_ENABLED=0 go build -o $(BINARY) $(PKG)
@@ -22,6 +23,9 @@ run: build
 
 serve: build
 	./$(BINARY) serve
+
+install:
+	CGO_ENABLED=0 go install -ldflags "-X github.com/danieljustus/symaira-scope/internal/version.Version=$(VERSION)" $(PKG)
 
 clean:
 	rm -f $(BINARY)

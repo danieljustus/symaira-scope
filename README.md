@@ -30,7 +30,15 @@ brew install danieljustus/tap/symscope
 
 ### Go
 
-Install the latest version from source:
+Install from source (recommended, so the binary reports the real version):
+
+```bash
+git clone https://github.com/danieljustus/symaira-scope && cd symaira-scope
+make install
+```
+
+Or install directly with `go install` (the binary then reports `dev` as its
+version, since no build-time version is injected):
 
 ```bash
 go install github.com/danieljustus/symaira-scope/cmd/symscope@latest

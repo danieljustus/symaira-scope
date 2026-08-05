@@ -11,9 +11,11 @@ import (
 
 	"github.com/danieljustus/symaira-corekit/exitcodes"
 	"github.com/danieljustus/symaira-corekit/logkit"
+
+	ver "github.com/danieljustus/symaira-scope/internal/version"
 )
 
-var version = "0.2.0"
+var version = ver.Version
 
 func main() {
 	slog.SetDefault(logkit.NewFromEnv("symscope"))
