@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "SymscopeFeature", targets: ["SymscopeFeature"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/danieljustus/symaira-appkit.git", exact: "0.2.0"),
+        .package(url: "https://github.com/danieljustus/symaira-appkit.git", exact: "0.7.0"),
     ],
     targets: [
         .target(
