@@ -30,7 +30,7 @@ jobs:
             echo "::error::No xcodebuild executable was found in the selected developer directory."
             exit 1
           fi
-          XCODE_VERSION="$(DEVELOPER_DIR="$DEVELOPER_DIR" xcodebuild -version | awk '$1 == "Xcode" { print $2; exit }')"
+          XCODE_VERSION="$(DEVELOPER_DIR="$DEVELOPER_DIR" xcodebuild -version | awk '$1 == "Xcode" { version = $2 } END { print version }')"
           if [ "$XCODE_VERSION" != "16.4" ]; then
             echo "::error::Xcode 16.4 is required on macos-15; found ${XCODE_VERSION:-unknown}."
             exit 1
