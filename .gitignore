@@ -29,6 +29,7 @@ coverage.*
 /client/build/
 /client/.build/
 /.build/
+/Package.resolved
 
 # Local agent reports / session state
 .omo/run-continuation/
