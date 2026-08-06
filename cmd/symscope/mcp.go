@@ -21,11 +21,17 @@ func newMCPCmd() *cobra.Command {
 
 	var checkCredentials bool
 	var files []string
+	var listFormat string
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List discovered MCP servers",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			out := output.New("json")
+			switch listFormat {
+			case "json", "ndjson", "manifest":
+			default:
+				return exitcodes.Wrap(fmt.Errorf("unsupported format %q (supported: json, ndjson, manifest)", listFormat), exitcodes.ExitConfig, exitcodes.KindValidation, "mcp list")
+			}
+			out := output.New(listFormat)
 			servers, notes := mcpcfg.Discover(mcpcfg.DefaultSources())
 			if len(files) > 0 {
 				fileServers, fileNotes := mcpcfg.DiscoverFiles(files)
@@ -42,11 +48,15 @@ func newMCPCmd() *cobra.Command {
 					slog.Warn(n)
 				}
 			}
+			if listFormat == "manifest" {
+				return output.New("json").Print(toManifestEntries(servers))
+			}
 			return out.Print(servers)
 		},
 	}
 	listCmd.Flags().BoolVar(&checkCredentials, "check-credentials", false, "Flag env values that look like exposed credentials")
 	listCmd.Flags().StringSliceVar(&files, "files", nil, "Additional config file(s) to parse; output is additive to default discovery")
+	listCmd.Flags().StringVar(&listFormat, "format", "json", "Output format: json, ndjson, or manifest (registry server.json-shaped)")
 	cmd.AddCommand(listCmd)
 
 	var addName, addCommand, addClient, addURL string

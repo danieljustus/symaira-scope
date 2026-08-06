@@ -80,5 +80,3 @@ type ClientConfig struct {
 	Path    string `json:"path"`
 	Present bool   `json:"present"`
 }
-
-
