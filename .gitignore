@@ -28,6 +28,7 @@ coverage.*
 *.xcworkspace
 /client/build/
 /client/.build/
+/.build/
 
 # Local agent reports / session state
 .omo/run-continuation/
