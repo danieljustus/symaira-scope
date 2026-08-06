@@ -1,6 +1,7 @@
 package mcphealth
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +20,7 @@ const (
 	helperEnv        = "SYMSCOPE_MCPHEALTH_HELPER"
 	helperEnvMode    = "SYMSCOPE_MCPHEALTH_HELPER_MODE"
 	helperEnvPidfile = "SYMSCOPE_MCPHEALTH_HELPER_PIDFILE"
+	helperEnvEcho    = "SYMSCOPE_MCPHEALTH_HELPER_ECHO"
 )
 
 // TestHelperProcess is not a real test: when the test binary is re-executed
@@ -29,6 +31,8 @@ const (
 //   - exit:     exits immediately (a server that dies before the handshake)
 //   - respond:  answers with a valid JSON-RPC initialize result
 //   - noresult: answers with a JSON-RPC error (no "result" field)
+//   - inspect:  echoes the received request method/params back inside the
+//     result (for Inspect* tests)
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv(helperEnv) != "1" {
 		return
@@ -54,6 +58,20 @@ func TestHelperProcess(t *testing.T) {
 	case "noresult":
 		_, _ = io.Copy(io.Discard, os.Stdin)
 		fmt.Fprint(os.Stdout, `{"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"bad request"}}`)
+		os.Exit(0)
+	case "inspect":
+		reqBytes, _ := io.ReadAll(os.Stdin)
+		var req map[string]any
+		_ = json.Unmarshal(reqBytes, &req)
+		result := map[string]any{
+			"method":   req["method"],
+			"echo_env": os.Getenv(helperEnvEcho),
+		}
+		if params, ok := req["params"]; ok {
+			result["params"] = params
+		}
+		resp, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "result": result})
+		fmt.Fprint(os.Stdout, string(resp))
 		os.Exit(0)
 	}
 	os.Exit(0)
