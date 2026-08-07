@@ -1,6 +1,9 @@
 // Package model holds the data types symscope produces. All fields use
-// snake_case JSON tags for agent-friendly output.
+// snake_case JSON tags for agent-friendly output (registry-inspired manifest
+// fields keep the registry's own camelCase names).
 package model
+
+import "encoding/json"
 
 // Snapshot is the full inventory produced by `scan`.
 type Snapshot struct {
@@ -51,6 +54,18 @@ type MCPHealthResult struct {
 	Error     string `json:"error,omitempty"`
 }
 
+// MCPInspectResult is the structured outcome of one JSON-RPC method call
+// against a discovered MCP server (`mcp inspect`). The server's own result
+// and error payloads are preserved verbatim.
+type MCPInspectResult struct {
+	Name      string          `json:"name"`
+	Client    string          `json:"client"`
+	Method    string          `json:"method"`
+	LatencyMs int64           `json:"latency_ms"`
+	Result    json.RawMessage `json:"result,omitempty"`
+	Error     json.RawMessage `json:"error,omitempty"`
+}
+
 // Conflict is a port bound by more than one process or occupied by a
 // configured service.
 type Conflict struct {
@@ -65,5 +80,3 @@ type ClientConfig struct {
 	Path    string `json:"path"`
 	Present bool   `json:"present"`
 }
-
-
