@@ -14,7 +14,7 @@ or "give me three free ports" itself.
 
 Part of the [Symaira](https://github.com/danieljustus) family (Go core, Apache-2.0, corekit-based).
 
-> **Status: v0.3.2** — MCP tool results are now schema-valid for strict
+> **Status: v0.4.0** — MCP tool results are now schema-valid for strict
 > clients (TextContent serialization fix in corekit v0.8.0), surgical JSONC
 > config editing for AI-client MCP configs (`mcp add`/`mcp remove`), a shared
 > Reporter interface for JSON/NDJSON output, and a branded DMG for the macOS
@@ -117,6 +117,9 @@ symscope ports list        # listening TCP/UDP ports + owning process
 symscope ports suggest     # free TCP ports  (--count --from --to)
 symscope mcp list          # MCP servers discovered across AI clients
 symscope mcp list --check-credentials  # flag env values that look like exposed secrets
+symscope mcp list --format manifest    # registry-shaped manifest (transport/packages/environmentVariables)
+symscope mcp inspect --name <server> --method tools/list   # list a discovered server's tools
+symscope mcp inspect --name <server> --method tools/call --tool-name <tool> --tool-arg key=value  # test-call a tool
 symscope clients list      # which AI clients have an MCP config present
 symscope containers        # running containers with published ports
 symscope conflicts         # ports bound by more than one process
@@ -146,6 +149,22 @@ Tools: `scan`, `ports_list`, `ports_suggest`, `mcp_list`, `conflicts`, `mcp_heal
 server when an `env` value looks like an exposed API key or token (e.g. `sk-...`,
 `ghp_...`, JWTs, or long high-entropy strings). `vault://` references and obvious
 placeholders are ignored.
+
+`mcp list --format manifest` reshapes each discovered server toward the MCP
+registry's `server.json` split, scoped to what symscope observes locally:
+`transport: {type: stdio|http}`, `packages: [{registryType: "local-binary",
+identifier: <server name>}]` (version is omitted — local configs carry no
+version), and `environmentVariables` (only when the config sets env). SSE
+servers are reported as `http`. The default `mcp list` output is unchanged.
+
+`mcp inspect` sends a JSON-RPC method (`tools/list` or `tools/call`) to one
+discovered server and prints the structured response (`--format json` for
+clean, script-parseable output). It executes the server's command or URL from
+its config — exactly like `mcp health --probe` — so only run it against
+servers you trust. For `tools/call`, pass `--tool-name` plus repeated
+`--tool-arg key=value` pairs (values that parse as JSON literals stay typed)
+or a single `--tool-args-json` object; the server's `env` entries are passed
+to the child process.
 
 ## Documentation
 

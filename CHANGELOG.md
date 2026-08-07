@@ -5,6 +5,16 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-07
+
+### Added
+- `mcp inspect` subcommand for direct MCP-server probing (`tools/list`, `tools/call`), flag-named after the modelcontextprotocol/inspector CLI convention.
+- `--format manifest` option for `mcp list` to emit the JSONC manifest.
+- Root-level Swift package mirroring the client package, so consumers (e.g. symaira-hub) can pin this repository by tag.
+
+### Infrastructure
+- Ignored root SwiftPM local artifacts (`.build/`, `Package.resolved`).
+
 ## [0.3.2] — 2026-08-05
 
 ### Fixed
