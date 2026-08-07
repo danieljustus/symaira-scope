@@ -250,10 +250,10 @@ jobs:
             echo "::error::No .app found for DMG creation."
             exit 1
           fi
-          hdiutil create -volname "Symscope" \
-            -srcfolder "$APP_PATH" \
-            -ov -format UDZO \
-            "client/build/release/Symscope-${VERSION}.dmg"
+          ./scripts/create-symaira-dmg.sh \
+            "$APP_PATH" \
+            "client/build/release/Symscope-${VERSION}.dmg" \
+            "Symscope"
 
       - name: Upload DMG to GitHub Release
         env:
