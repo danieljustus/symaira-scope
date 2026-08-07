@@ -103,9 +103,11 @@ jobs:
           xcodegen generate
 
       - name: Build and archive Swift App
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          VERSION="${{ inputs.tag }}"
+          VERSION="${RELEASE_TAG}"
           VERSION="${VERSION#v}"
           xcodebuild archive \
             -project client/Symscope.xcodeproj \
@@ -174,9 +176,11 @@ jobs:
           xcrun stapler validate "$APP_PATH"
 
       - name: Create DMG
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          VERSION="${{ inputs.tag }}"
+          VERSION="${RELEASE_TAG}"
           VERSION="${VERSION#v}"
           APP_PATH=$(find client/build/release/export -name "*.app" -type d | head -1)
           if [ -z "$APP_PATH" ]; then
@@ -191,13 +195,14 @@ jobs:
       - name: Upload DMG to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          VERSION="${{ inputs.tag }}"
+          VERSION="${RELEASE_TAG}"
           VERSION="${VERSION#v}"
           DMG_PATH="client/build/release/Symscope-${VERSION}.dmg"
           test -s "$DMG_PATH"
-          gh release upload "${{ inputs.tag }}" \
+          gh release upload "$RELEASE_TAG" \
             "${DMG_PATH}#Symscope-${VERSION}.dmg" \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
