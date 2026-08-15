@@ -33,7 +33,8 @@ internal/config/        configkit loader
   (`configkit`), exit codes/errors (`exitcodes`), logging (`logkit`), update
   checks (`updatecheck`). Never vendor or fork these.
 - **Never commit a `replace ../symaira-corekit`** in go.mod — it breaks CI. Pin
-  the published version (currently `v0.8.0`).
+  a published, tagged corekit release; `go.mod` is the source of truth for
+  which one.
 - **Zero stdout pollution in `serve`**: stdout carries only JSON-RPC frames; all
   logs go to stderr via slog (`logkit`).
 - **Read-only & local for discovery**: discovery/read paths never mutate client
