@@ -1,15 +1,12 @@
 ## What's changed
 
 ### Fixed
-- Harden macOS release signing, App Store Connect notarization, embedded-engine signing, and DMG publishing.
+- #133 Add a manual DMG recovery workflow to rebuild and re-upload the macOS app disk image after a failed release run.
 
 ### Changed
-- Refresh the private `symaira-appkit` resolution used by the macOS client to v0.2.0.
+- #135 Unified the DMG branding across the Symaira family and added a drag-to-Applications window to the installer image.
 
-### Infrastructure
-- Re-enable CGO-free Go linting with golangci-lint v2.
-- Pin CodeQL to v4.37.4 and configure a Dependabot cooldown.
-- Add contributor guidance, issue forms, a pull-request template, and a Code of Conduct.
-- Improve README onboarding and installation instructions.
+### Dependencies
+- #136 Bump github.com/shirou/gopsutil/v4 from 4.26.6 to 4.26.7.
 
-**Full Changelog**: https://github.com/danieljustus/symaira-scope/compare/v0.3.0...v0.3.1
+**Full Changelog**: https://github.com/danieljustus/symaira-scope/compare/v0.4.0...v0.4.1
