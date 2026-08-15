@@ -22,6 +22,8 @@ Part of the [Symaira](https://github.com/danieljustus) family (Go core, Apache-2
 
 ## Demo
 
+![symscope scan terminal output — listening ports, MCP servers, and containers in one snapshot](assets/demo-scan.svg)
+
 ```console
 $ symscope scan | head -30
 {
