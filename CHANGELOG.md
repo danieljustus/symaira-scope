@@ -5,6 +5,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-08-15
+
+### Fixed
+- Added a manual DMG recovery workflow for rebuilding and re-uploading the macOS app disk image after a failed release run.
+
+### Changed
+- Unified the DMG branding across the Symaira family and added a drag-to-Applications window to the installer image.
+
+### Dependencies
+- Bumped `github.com/shirou/gopsutil/v4` to 4.26.7.
+
 ## [0.4.0] — 2026-08-07
 
 ### Added
