@@ -3,6 +3,7 @@ name: CodeQL
 on:
   schedule:
     - cron: "23 4 * * 1"  # Monday 04:23 UTC
+  workflow_dispatch:
 concurrency:
   group: codeql-${{ github.ref }}
   cancel-in-progress: true
